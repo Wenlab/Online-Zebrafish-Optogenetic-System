@@ -29,6 +29,55 @@ int main()
 
 	Rect lightArea(50, 50, 10, 10);
 	FishReg.getRegionFromUser(lightArea);
+
+	vector<float> Fix2ZBBAM{ 0.995751 ,-0.0000857003 ,0.00319121 ,
+		-0.000161462 ,1.06928 ,0.000254662 ,
+		0.0136118 ,-0.0196541 ,1.22397 ,
+		0.0194115 ,0 ,0 };
+
+	vector<float> Moving2FixAM{ 0.993222 ,-0.10944 ,-0.0136222 ,
+								0.127151 ,0.987073 ,0.00369118 ,
+								0.0021671 ,-0.0144663 ,0.988299,
+								7.98918 ,-4.16694 ,0.343009 };
+	Point3f cropPoint(53, 62, 0);
+	double rotationAngleZ = -130;
+	double rotationAngleX = 10;
+
+	FishReg.getZBB2FixAffineMatrix(Fix2ZBBAM);
+	FishReg.getFix2MovingAffineMatrix(Moving2FixAM);
+	FishReg.getCropPoint(cropPoint);
+	FishReg.getRotationMatrix(rotationAngleZ, rotationAngleX);
+
+	FishReg.ZBB2FishTransform();   //已获取区域信息
+
+
+
+	//test
+	Mat zbbMIP = imread("Ref-zbb-MIP.png");
+	rectangle(zbbMIP, lightArea, Scalar(255), 1);
+	namedWindow("zbbMIP", 0);
+	resizeWindow("zbbMIP", Size(zbbMIP.cols * 4, zbbMIP.rows * 4));
+	imshow("zbbMIP", zbbMIP);
+
+	for (int i = 0; i < FishReg.BrainRegionName.size(); i++)
+	{
+		cout << FishReg.BrainRegionName[i] << endl;
+	}
+
+	vector<Point3f> RegionCoord_5 = FishReg.regionInFish;
+	Mat origImg(Size(200, 200), CV_8UC3);
+	origImg.setTo(0);
+	for (int i = 0; i < RegionCoord_5.size(); i++)
+	{
+		Point3f p = RegionCoord_5[i];
+		circle(origImg, Point(p.x, p.y), 1, Scalar(255));
+	}
+
+	imshow("result", origImg);
+
+	waitKey(0);
+
+	return 0;
 }
 
 //vector<pair<string, Point>> readZBBMapFromTxt(string file);

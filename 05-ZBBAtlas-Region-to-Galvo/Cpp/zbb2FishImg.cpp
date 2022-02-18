@@ -26,7 +26,7 @@ void zbb2FishImg::initialize()
 
 void zbb2FishImg::getRegionFromUser(cv::Rect Reg)
 {
-	Region = Reg;//for test
+	Region = Reg;
 
 	//将区域转化成坐标
 	for (int i = Region.x; i < Region.x + Region.width; i++)
