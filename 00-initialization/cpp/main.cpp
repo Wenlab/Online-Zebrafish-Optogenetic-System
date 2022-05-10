@@ -1,0 +1,315 @@
+#include "itkImageRegistrationMethod.h"
+#include "itkAffineTransform.h"
+#include "itkMutualInformationImageToImageMetric.h"
+#include "itkGradientDescentOptimizer.h"
+#include "itkNormalizeImageFilter.h"
+#include "itkDiscreteGaussianImageFilter.h"
+#include "itkResampleImageFilter.h"
+#include "itkCastImageFilter.h"
+#include "itkCheckerBoardImageFilter.h"
+#include "itkEllipseSpatialObject.h"
+#include "itkSpatialObjectToImageFilter.h"
+#include "itkImageFileWriter.h"
+#include "itkImageFileReader.h"
+#include "itkNIFTIImageIOFactory.h"
+#include "itkNiftiImageIO.h"
+#include "itkTIFFImageIOFactory.h"
+#include "itkTIFFImageIO.h"
+
+#include <stdlib.h>
+#include <fstream>
+#include <string>
+#include <iostream>
+
+constexpr unsigned int Dimension = 3;
+using PixelType = unsigned short int;
+
+using ImageType = itk::Image<PixelType, Dimension>;
+
+int main(int argc, char * argv[])
+{
+	using ReaderType = itk::ImageFileReader<ImageType>;
+	itk::NiftiImageIOFactory::RegisterOneFactory();
+	itk::TIFFImageIOFactory::RegisterOneFactory();
+
+
+	std::cout << "1111" << std::endl;
+
+	if (argc < 4)
+	{
+		std::cout << "Usage: " << argv[0] << " imageFile1(fix Image) imageFile2(moving Image) outputFile" << std::endl;
+		return EXIT_FAILURE;
+	}
+	ReaderType::Pointer fixedReader = ReaderType::New();
+	fixedReader->SetFileName(argv[1]);
+	fixedReader->Update();
+	ImageType::Pointer fixedImage = fixedReader->GetOutput();
+
+
+	std::cout << "2222" << std::endl;
+
+	ReaderType::Pointer movingReader = ReaderType::New();
+	movingReader->SetFileName(argv[2]);
+	movingReader->Update();
+	ImageType::Pointer movingImage = movingReader->GetOutput();
+
+	// We use floats internally
+	using InternalImageType = itk::Image<float, Dimension>;
+
+	// Normalize the images
+	using NormalizeFilterType = itk::NormalizeImageFilter<ImageType, InternalImageType>;
+
+	NormalizeFilterType::Pointer fixedNormalizer = NormalizeFilterType::New();
+	NormalizeFilterType::Pointer movingNormalizer = NormalizeFilterType::New();
+
+	fixedNormalizer->SetInput(fixedImage);
+	movingNormalizer->SetInput(movingImage);
+
+	// Smooth the normalized images
+	using GaussianFilterType = itk::DiscreteGaussianImageFilter<InternalImageType, InternalImageType>;
+
+	GaussianFilterType::Pointer fixedSmoother = GaussianFilterType::New();
+	GaussianFilterType::Pointer movingSmoother = GaussianFilterType::New();
+
+	fixedSmoother->SetVariance(2.0);
+	movingSmoother->SetVariance(2.0);
+
+	fixedSmoother->SetInput(fixedNormalizer->GetOutput());
+	movingSmoother->SetInput(movingNormalizer->GetOutput());
+
+
+	std::cout << "3333" << std::endl;
+
+	using TransformType = itk::AffineTransform<double, Dimension>;
+	using OptimizerType = itk::GradientDescentOptimizer;
+	using InterpolatorType = itk::LinearInterpolateImageFunction<InternalImageType, double>;
+	using RegistrationType = itk::ImageRegistrationMethod<InternalImageType, InternalImageType>;
+	using MetricType = itk::MutualInformationImageToImageMetric<InternalImageType, InternalImageType>;
+
+	TransformType::Pointer    transform = TransformType::New();
+	OptimizerType::Pointer    optimizer = OptimizerType::New();
+	InterpolatorType::Pointer interpolator = InterpolatorType::New();
+	RegistrationType::Pointer registration = RegistrationType::New();
+
+	registration->SetOptimizer(optimizer);
+	registration->SetTransform(transform);
+	registration->SetInterpolator(interpolator);
+
+	MetricType::Pointer metric = MetricType::New();
+	registration->SetMetric(metric);
+
+
+	std::cout << "4444" << std::endl;
+
+	//  The metric requires a number of parameters to be selected, including
+	//  the standard deviation of the Gaussian kernel for the fixed image
+	//  density estimate, the standard deviation of the kernel for the moving
+	//  image density and the number of samples use to compute the densities
+	//  and entropy values. Details on the concepts behind the computation of
+	//  the metric can be found in Section
+	//  \ref{sec:MutualInformationMetric}.  Experience has
+	//  shown that a kernel standard deviation of $0.4$ works well for images
+	//  which have been normalized to a mean of zero and unit variance.  We
+	//  will follow this empirical rule in this example.
+
+	metric->SetFixedImageStandardDeviation(5.0);
+	metric->SetMovingImageStandardDeviation(5.0);
+
+	registration->SetFixedImage(fixedSmoother->GetOutput());
+	registration->SetMovingImage(movingSmoother->GetOutput());
+
+	fixedNormalizer->Update();
+	ImageType::RegionType fixedImageRegion = fixedNormalizer->GetOutput()->GetBufferedRegion();
+	registration->SetFixedImageRegion(fixedImageRegion);
+
+	using ParametersType = RegistrationType::ParametersType;
+	ParametersType initialParameters(transform->GetNumberOfParameters());
+
+	// rotation matrix (identity)
+	initialParameters[0] = 1.0; // R(0,0)
+	initialParameters[1] = 0.0; // R(0,1)
+	initialParameters[2] = 0.0; // R(0,2)
+	initialParameters[3] = 0.0; // R(1,0)
+	initialParameters[4] = 1.0; // R(1,1)
+	initialParameters[5] = 0.0; // R(1,2)
+	initialParameters[6] = 0.0; // R(2,0)
+	initialParameters[7] = 0.0; // R(2,1)
+	initialParameters[8] = 1.0; // R(2,2)
+
+	// translation vector
+	initialParameters[9] = 0.0;
+	initialParameters[10] = 0.0;
+	initialParameters[11] = 0.0;
+
+
+	std::cout << "5555" << std::endl;
+
+	registration->SetInitialTransformParameters(initialParameters);
+
+	//  Software Guide : BeginLatex
+	//
+	//  We should now define the number of spatial samples to be considered in
+	//  the metric computation. Note that we were forced to postpone this setting
+	//  until we had done the preprocessing of the images because the number of
+	//  samples is usually defined as a fraction of the total number of pixels in
+	//  the fixed image.
+	//
+	//  The number of spatial samples can usually be as low as $1\%$ of the total
+	//  number of pixels in the fixed image. Increasing the number of samples
+	//  improves the smoothness of the metric from one iteration to another and
+	//  therefore helps when this metric is used in conjunction with optimizers
+	//  that rely of the continuity of the metric values. The trade-off, of
+	//  course, is that a larger number of samples result in longer computation
+	//  times per every evaluation of the metric.
+	//
+	//  It has been demonstrated empirically that the number of samples is not a
+	//  critical parameter for the registration process. When you start fine
+	//  tuning your own registration process, you should start using high values
+	//  of number of samples, for example in the range of $20\%$ to $50\%$ of the
+	//  number of pixels in the fixed image. Once you have succeeded to register
+	//  your images you can then reduce the number of samples progressively until
+	//  you find a good compromise on the time it takes to compute one evaluation
+	//  of the Metric. Note that it is not useful to have very fast evaluations
+	//  of the Metric if the noise in their values results in more iterations
+	//  being required by the optimizer to converge. You must then study the
+	//  behavior of the metric values as the iterations progress.
+
+	const unsigned int numberOfPixels = fixedImageRegion.GetNumberOfPixels();
+
+	const auto numberOfSamples = static_cast<unsigned int>(numberOfPixels * 0.01);
+
+	metric->SetNumberOfSpatialSamples(numberOfSamples);
+
+	// For consistent results when regression testing.
+	metric->ReinitializeSeed(121212);
+
+	std::cout << "6666" << std::endl;
+
+	// Note that large values of the learning rate will make the optimizer
+	// unstable. Small values, on the other hand, may result in the optimizer
+	// needing too many iterations in order to walk to the extrema of the cost
+	// function. The easy way of fine tuning this parameter is to start with
+	// small values, probably in the range of $\{5.0,10.0\}$. Once the other
+	// registration parameters have been tuned for producing convergence, you
+	// may want to revisit the learning rate and start increasing its value until
+	// you observe that the optimization becomes unstable.  The ideal value for
+	// this parameter is the one that results in a minimum number of iterations
+	// while still keeping a stable path on the parametric space of the
+	// optimization. Keep in mind that this parameter is a multiplicative factor
+	// applied on the gradient of the Metric. Therefore, its effect on the
+	// optimizer step length is proportional to the Metric values themselves.
+	// Metrics with large values will require you to use smaller values for the
+	// learning rate in order to maintain a similar optimizer behavior.
+	optimizer->SetLearningRate(1.0);
+
+	// Note that the only stop condition for the v3 GradientDescentOptimizer class
+	// is that the maximum number of iterations is reached.
+	// For the option to exit early on convergence use GradientDescentOptimizerv4
+	// with an accompanying v4 metric class.
+	optimizer->SetNumberOfIterations(200);
+	optimizer->MaximizeOn(); // We want to maximize mutual information (the default of the optimizer is to minimize)
+
+	auto scales = optimizer->GetScales();
+
+	std::cout << "7777" << std::endl;
+
+	// Let optimizer take
+	// large steps along translation parameters,
+	// moderate steps along rotational parameters,
+	// and small steps along scale parameters
+
+	//std::cout << registration->GetLastTransformParameters() << std::endl;
+	scales.SetSize(12);
+	scales.SetElement(0, 100);
+	scales.SetElement(1, 0.5);
+	scales.SetElement(2, 0.5);
+	scales.SetElement(3, 0.5);
+	scales.SetElement(4, 100);
+	scales.SetElement(5, 0.5);
+	scales.SetElement(6, 0.5);
+	scales.SetElement(7, 0.5);
+	scales.SetElement(8, 100);
+
+	scales.SetElement(9, 0.0001);
+	scales.SetElement(10, 0.0001);
+	scales.SetElement(11, 0.0001);
+
+	optimizer->SetScales(scales);
+	//std::cout << registration->GetLastTransformParameters() << std::endl;
+	std::cout << "8888" << std::endl;
+
+	try
+	{
+		registration->Update();
+		std::cout << "Optimizer stop condition: " << registration->GetOptimizer()->GetStopConditionDescription()
+			<< std::endl;
+	}
+	catch (itk::ExceptionObject & err)
+	{
+		std::cout << registration->GetLastTransformParameters() << std::endl;
+		std::cout << "ExceptionObject caught !" << std::endl;
+		std::cout << err << std::endl;
+		return EXIT_FAILURE;
+	}
+
+	std::cout << "9999" << std::endl;
+
+	ParametersType finalParameters = registration->GetLastTransformParameters();
+
+
+
+	std::cout << "Final Parameters: " << finalParameters << std::endl;
+
+	unsigned int numberOfIterations = optimizer->GetCurrentIteration();
+
+	double bestValue = optimizer->GetValue();
+
+	// Print out results
+	std::cout << std::endl;
+	std::cout << "Result = " << std::endl;
+	std::cout << " Iterations    = " << numberOfIterations << std::endl;
+	std::cout << " Metric value  = " << bestValue << std::endl;
+	std::cout << " Numb. Samples = " << numberOfSamples << std::endl;
+
+
+
+
+	using ResampleFilterType = itk::ResampleImageFilter<ImageType, ImageType>;
+
+	TransformType::Pointer finalTransform = TransformType::New();
+
+	finalTransform->SetParameters(finalParameters);
+	finalTransform->SetFixedParameters(transform->GetFixedParameters());
+
+	ResampleFilterType::Pointer resample = ResampleFilterType::New();
+
+	resample->SetTransform(finalTransform);
+	resample->SetInput(movingImage);
+
+	resample->SetSize(fixedImage->GetLargestPossibleRegion().GetSize());
+	resample->SetOutputOrigin(fixedImage->GetOrigin());
+	resample->SetOutputSpacing(fixedImage->GetSpacing());
+	resample->SetOutputDirection(fixedImage->GetDirection());
+	resample->SetDefaultPixelValue(0);
+
+	std::string filename = argv[3];
+	//write out
+	std::cout << "write affine params to txt...." << std::endl;
+	std::ofstream fOut(filename.substr(0, filename.rfind("."))+".txt");
+	if (!fOut)
+	{
+		std::cout << "Open output file faild." << std::endl;
+	}
+	fOut << finalParameters << std::endl;
+	fOut.close();
+	std::cout << "done" << std::endl;
+
+
+	using WriterType = itk::ImageFileWriter<ImageType>;
+	WriterType::Pointer writer = WriterType::New();
+	writer->SetFileName(filename);
+	writer->SetInput(resample->GetOutput());
+	writer->Update();
+
+	return EXIT_SUCCESS;
+}

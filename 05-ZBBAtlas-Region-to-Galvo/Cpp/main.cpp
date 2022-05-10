@@ -3,6 +3,8 @@
 #include <cassert>
 #include <string>
 #include <vector>
+#include<io.h>
+#include <sstream>
 #include<opencv2/core/core.hpp>
 #include<opencv2/opencv.hpp>
 #include<opencv2/highgui.hpp>
@@ -11,6 +13,8 @@
 #include <Eigen/Geometry>
 #define _USE_MATH_DEFINES
 #include <math.h>
+
+
 
 #include"zbb2FishImg.h"
 
@@ -21,64 +25,200 @@ using namespace cv;
 
 #pragma warning(disable : 4996)
 
+// create a trackbar
+const int max_width = 60;
+const int max_height = 80;
+int w_pos = 0;
+int h_pos = 0;
+
+std::vector<std::vector<float>> readParamsFromTXT(std::string filename, const char* split);
+void getFileNames(std::string path, std::vector<std::string>& files);
+
+void trackbar_width(int, void*)
+{
+	w_pos = getTrackbarPos("w_pos", "test_trackbar");
+	return;
+}
+void trackbar_height(int, void*)
+{
+	h_pos = getTrackbarPos("w_pos", "test_trackbar");
+	return;
+}
+
 int main()
 {
 	//测试zbb2FishImg
 	zbb2FishImg FishReg;
 	FishReg.initialize();
 
-	Rect lightArea(50, 50, 10, 10);
-	FishReg.getRegionFromUser(lightArea);
+	namedWindow("test_trackbar", 1);
+	//创建轨迹条
+	createTrackbar("w_pos", "test_trackbar", &w_pos, max_width, trackbar_width);
+	createTrackbar("h_pos", "test_trackbar", &h_pos, max_height, trackbar_height);
 
-	vector<float> Fix2ZBBAM{ 0.995751 ,-0.0000857003 ,0.00319121 ,
-		-0.000161462 ,1.06928 ,0.000254662 ,
-		0.0136118 ,-0.0196541 ,1.22397 ,
-		0.0194115 ,0 ,0 };
 
-	vector<float> Moving2FixAM{ 0.993222 ,-0.10944 ,-0.0136222 ,
-								0.127151 ,0.987073 ,0.00369118 ,
-								0.0021671 ,-0.0144663 ,0.988299,
-								7.98918 ,-4.16694 ,0.343009 };
-	Point3f cropPoint(53, 62, 0);
-	double rotationAngleZ = -130;
-	double rotationAngleX = 10;
+	//从txt文件中读取测试数据
+	const char* ch1 = ",";
+	const char* ch2 = " ";
+	std::vector<std::vector<float>> crop = readParamsFromTXT("F:/ITK/matchingZBB/matchingZBB/TM_test5/params/cropPoint.txt", ch1);
+	std::vector<std::vector<float>> rotationAngleXY = readParamsFromTXT("F:/ITK/matchingZBB/matchingZBB/TM_test5/params/rotationAngleXY.txt", ch1);
+	std::vector<std::vector<float>> rotationAngleYZ = readParamsFromTXT("F:/ITK/matchingZBB/matchingZBB/TM_test5/params/rotationAngleYZ.txt", ch1);
+	std::vector<std::vector<float>> fix2movingParam = readParamsFromTXT("F:/ITK/matchingZBB/matchingZBB/TM_test5/params/fix2movingParam.txt", ch2);
 
-	FishReg.getZBB2FixAffineMatrix(Fix2ZBBAM);
-	FishReg.getFix2MovingAffineMatrix(Moving2FixAM);
-	FishReg.getCropPoint(cropPoint);
-	FishReg.getRotationMatrix(rotationAngleZ, rotationAngleX);
-
-	FishReg.ZBB2FishTransform();   //已获取区域信息
+	//TEST IMAGES
+	std::vector<std::string> imgfilenames;
+	getFileNames("F:/ITK/matchingZBB/matchingZBB/TM_test5/MIP", imgfilenames);
 
 
 
-	//test
-	Mat zbbMIP = imread("Ref-zbb-MIP.png");
-	rectangle(zbbMIP, lightArea, Scalar(255), 1);
-	namedWindow("zbbMIP", 0);
-	resizeWindow("zbbMIP", Size(zbbMIP.cols * 4, zbbMIP.rows * 4));
-	imshow("zbbMIP", zbbMIP);
+	//cout << crop.size() << endl;
+	//for (int j = 0; j < crop.size(); j++)
+	//{
+	//	for (int i = 0; i < crop[j].size(); i++)
+	//	{
+	//		cout << crop[j][i] << "    ";
+	//	}
+	//	cout << endl;
+	//}
 
-	for (int i = 0; i < FishReg.BrainRegionName.size(); i++)
+	vector<float> Fix2ZBBAM{ 0.985154,	0.0184487, - 0.00942914,
+		-0.0166061,	1.13246, - 0.102937,
+		0.0196408, - 0.0078765,	1.25844,
+		0.522241, - 6.91866, - 11.7296 };
+	//for(int i = 0; i< fix2movingParam.size(); i++)
+	while (1)
 	{
-		cout << FishReg.BrainRegionName[i] << endl;
+		for (int i = 0; i < 1; i++)
+		{
+			w_pos = getTrackbarPos("w_pos", "test_trackbar");
+			h_pos = getTrackbarPos("h_pos", "test_trackbar");
+
+			Rect lightArea(w_pos, h_pos, 10, 10);
+			FishReg.getRegionFromUser(lightArea);
+
+
+			//vector<float> Moving2FixAM{ 0.998911, -0.0885304, -0.00483924,
+			//	0.121989,   0.988682,   0.0257309,
+			//	0.000398744, -0.0268302,   1.01408,
+			//	6.49591, -4.78014,   1.13219 };
+			vector<float> Moving2FixAM = fix2movingParam[i];
+			Point3f cropPoint(crop[i][1], crop[i][0], 0);   //matlab出的坐标和C是反的   如果全部整合成C 这里变成先0再1
+			float AngleXY = rotationAngleXY[i][0];
+			float AngleYZ = rotationAngleYZ[i][0];
+			//Point3f cropPoint(54, 64, 0);
+			//double rotationAngleXY = -153;
+			////double rotationAngleZ = -160;
+			//double rotationAngleYZ = 10;
+
+
+
+			FishReg.getZBB2FixAffineMatrix(Fix2ZBBAM);
+			FishReg.getFix2MovingAffineMatrix(Moving2FixAM);
+			FishReg.getCropPoint(cropPoint);
+			FishReg.getRotationMatrix(AngleXY, AngleYZ);
+
+			FishReg.ZBB2FishTransform();   //已获取区域信息
+
+
+
+			//test
+			Mat zbbMIP = imread("Ref-zbb-MIP.png");
+			rectangle(zbbMIP, lightArea, Scalar(255), 1);
+			namedWindow("zbbMIP", 0);
+			resizeWindow("zbbMIP", Size(zbbMIP.cols * 4, zbbMIP.rows * 4));
+			imshow("zbbMIP", zbbMIP);
+
+			//for (int i = 0; i < FishReg.BrainRegionName.size(); i++)
+			//{
+			//	cout << FishReg.BrainRegionName[i] << endl;
+			//}
+
+			vector<Point3f> RegionCoord_5 = FishReg.regionInFish;
+			Mat origImg = imread(imgfilenames[i]);
+			//origImg.setTo(0);
+			for (int i = 0; i < RegionCoord_5.size(); i++)
+			{
+				Point3f p = RegionCoord_5[i];
+				circle(origImg, Point(p.x, p.y), 1, Scalar(255));
+			}
+			RegionCoord_5.clear();
+			imshow("result", origImg);
+
+
+			//cout << i << endl;
+			waitKey(30);
+
+
+			FishReg.clear();
+		}
 	}
-
-	vector<Point3f> RegionCoord_5 = FishReg.regionInFish;
-	Mat origImg(Size(200, 200), CV_8UC3);
-	origImg.setTo(0);
-	for (int i = 0; i < RegionCoord_5.size(); i++)
-	{
-		Point3f p = RegionCoord_5[i];
-		circle(origImg, Point(p.x, p.y), 1, Scalar(255));
-	}
-
-	imshow("result", origImg);
-
-	waitKey(0);
 
 	return 0;
 }
+
+
+std::vector<std::vector<float>> readParamsFromTXT(std::string filename, const char* split)
+{
+	std::ifstream fin(filename);
+	if (!fin)
+	{
+		cout << "error! can't open file" << endl;
+	}
+
+	std::vector<std::vector<float>> datas;
+	std::vector<float> in;
+	string s;
+
+	while (getline(fin, s))
+	{
+		//string to char
+		char *s_input = (char*)s.c_str();
+		//const char * split = " ";
+		char *buf;
+		char *p = strtok_s(s_input, split, &buf);
+		double a;
+		while (p != NULL)
+		{
+			a = atof(p);
+			in.push_back(a);
+			p = strtok_s(NULL, split, &buf);
+		}
+		datas.push_back(in);
+		in.clear();
+	}
+	fin.close();
+
+	return datas;
+}
+ 
+void getFileNames(std::string path, std::vector<std::string>& files)
+{
+	//文件句柄
+	//注意：我发现有些文章代码此处是long类型，实测运行中会报错访问异常
+	intptr_t hFile = 0;
+	//文件信息
+	struct _finddata_t fileinfo;
+	std::string p;
+	if ((hFile = _findfirst(p.assign(path).append("\\*").c_str(), &fileinfo)) != -1)
+	{
+		do
+		{
+			//如果是目录,递归查找
+			//如果不是,把文件绝对路径存入vector中
+			if ((fileinfo.attrib & _A_SUBDIR))
+			{
+				if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0)
+					getFileNames(p.assign(path).append("\\").append(fileinfo.name), files);
+			}
+			else
+			{
+				files.push_back(p.assign(path).append("\\").append(fileinfo.name));
+			}
+		} while (_findnext(hFile, &fileinfo) == 0);
+		_findclose(hFile);
+	}
+}
+
 
 //vector<pair<string, Point>> readZBBMapFromTxt(string file);
 //

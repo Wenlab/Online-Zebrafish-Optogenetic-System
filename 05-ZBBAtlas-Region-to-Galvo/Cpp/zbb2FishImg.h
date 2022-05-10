@@ -45,6 +45,7 @@ public:
 	std::vector<std::pair<std::string, cv::Point>> readZBBMapFromTxt(std::string file);
 	std::vector<std::vector<std::vector<std::string>>> makeZbbMapVec(std::vector<std::pair<std::string, cv::Point>> zbbMapPair);
 	std::vector<std::string> queryRegionName(cv::Rect region);
+	void clear();
 };
 
 std::vector<float> inverseAffineMatrix(std::vector<float> am);

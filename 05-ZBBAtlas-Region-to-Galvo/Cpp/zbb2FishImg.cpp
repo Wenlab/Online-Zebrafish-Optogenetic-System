@@ -95,8 +95,9 @@ void zbb2FishImg::ZBB2FishTransform()
 {
 	for (int i = 0; i < RegionCoord.size(); i++)
 	{
+		Point3f p;
 		Point3f temp = RegionCoord[i];
-		Point3f p = applyAffineMatrixOn3DCoord(temp, zbb2FixAM);
+		p = applyAffineMatrixOn3DCoord(temp, zbb2FixAM);
 		p = applyAffineMatrixOn3DCoord(p, Fix2MovingAM);
 		p = p + cropPoint;
 		p = applyRotationMatrixOn3DCoord(p, rotationMatrix);
@@ -106,8 +107,6 @@ void zbb2FishImg::ZBB2FishTransform()
 
 	return;
 }
-
-
 
 
 vector<pair<string, Point>> zbb2FishImg::readZBBMapFromTxt(string file)
@@ -189,6 +188,18 @@ vector<string> zbb2FishImg::queryRegionName(Rect region)
 
 	return queryRegion;
 }
+
+
+void zbb2FishImg::clear()
+{
+	BrainRegionName.clear();
+	RegionCoord.clear();
+
+	regionInFish.clear();
+	return;
+}
+
+
 
 std::vector<float> inverseAffineMatrix(std::vector<float> am)
 {

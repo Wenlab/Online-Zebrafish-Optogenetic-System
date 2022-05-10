@@ -55,11 +55,12 @@ std::string int2string(int n, int i);
 
 int main()
 {
+	std::string path = "F:/ITK/initialization/matlab/standardZBBtest/StandardDatas/01/";
 	//get all image file name
 	std::vector<std::string> fixfilenames;
-	getFileNames("C:/Users/USER/source/repos/Project3/Project3/0824_0924CMTK_AM_TM3_x10_delete/fixImg", fixfilenames);
+	getFileNames(path+"fix/", fixfilenames);
 	std::vector<std::string> movingfilenames;
-	getFileNames("C:/Users/USER/source/repos/Project3/Project3/0824_0924CMTK_AM_TM3_x10_delete/movingImg", movingfilenames);
+	getFileNames(path+"moving/", movingfilenames);
 	if (fixfilenames.size() == movingfilenames.size())
 	{
 		std::cout << "fix file num : " << fixfilenames.size() << std::endl;
@@ -85,7 +86,7 @@ int main()
 		device_type = torch::kCPU;
 		std::cout << "cuda not avaliable" << std::endl;
 	}
-	//device_type = torch::kCPU;
+
 	torch::Device device(device_type);
 
 	// load model
@@ -96,24 +97,42 @@ int main()
 
 
 	//read image with ITK
-	std::string resultpath = "C:\\Users\\USER\\source\\repos\\Project3\\Project3\\0824_0924CMTK_AM_TM3_x10_delete\\result\\";
+	//对movingImage做仿射变换和fix对齐之后的结果
+	std::string resultpath = path + "result1/";
 	int ret = _access(resultpath.c_str(), 0);
 	if (ret != 0)
 	{
 		_mkdir(resultpath.c_str());
 	}
-	std::string doubleAffinePath = "C:\\Users\\USER\\source\\repos\\Project3\\Project3\\0824_0924CMTK_AM_TM3_x10_delete\\result2\\";
+
+	// 求affineMatrix的逆运算后，对fixImg逆仿射
+	// 检查逆仿射是否结果正确
+	std::string doubleAffinePath = path+"result2/";
 	ret = _access(doubleAffinePath.c_str(), 0);
 	if (ret != 0)
 	{
 		_mkdir(doubleAffinePath.c_str());
 	}
-	std::string finallyPath = "C:\\Users\\USER\\source\\repos\\Project3\\Project3\\0824_0924CMTK_AM_TM3_x10_delete\\result3\\";
+	std::string finallyPath = path+"result3/";
 	ret = _access(finallyPath.c_str(), 0);
 	if (ret != 0)
 	{
 		_mkdir(finallyPath.c_str());
 	}
+
+
+	std::string filename = path+"fix2movingParam.txt";
+	//write out
+	std::cout << "write affine params to txt...." << std::endl;
+	std::ofstream fOut(filename);
+	if (!fOut)
+	{
+		std::cout << "Open output file faild." << std::endl;
+	}
+
+
+
+
 	for (int i = 1; i < fixfilenames.size(); i++)
 	//for (int i = 0; i < 5; i++)
 	{
@@ -136,17 +155,25 @@ int main()
 		//std::cout << "tensor size: " << fixtensor.sizes() << std::endl;
 
 
-		// forward
-		//Timer timer;
-		//timer.start();
-		//for (int j = 0; j < 1000; j++)
-		//{
+		 //forward
+	/*	Timer timer;
+		timer.start();
+		for (int j = 0; j < 1000; j++)
+		{*/
 		auto output = model.forward({ movingtensor.to(device),fixtensor.to(device) }).toTensor();
 		//}
 		//timer.stop();
-		//std::cout <<"模型运行1000次所需时间：" <<timer.getElapsedTimeInMilliSec() << std::endl;
-		//std::cout << output << std::endl;
+		//std::cout <<"模型运行所需时间：" <<timer.getElapsedTimeInMilliSec()/1000 << std::endl;
+
+
+
 		std::vector<float> am = rescaleAffineMatrix(output);
+
+		for (int k = 0; k < am.size(); k++)
+		{
+			fOut << am[k] << "   ";
+		}
+		fOut << std::endl;
 
 		ImageType::Pointer afterAffineImg = warpImage(moving, am);
 		//std::cout << "warp result size" << afterAffineImg->GetLargestPossibleRegion().GetSize() << std::endl;
@@ -164,7 +191,7 @@ int main()
 		// 求affineMatrix的逆运算后，对fixImg逆仿射
 		std::vector<float> am_inverse = reverseAffineMatrix(am);
 		//warp image
-		ImageType::Pointer InverseAffineFixImg= warpImage(fix, am_inverse);
+		ImageType::Pointer InverseAffineFixImg = warpImage(fix, am_inverse);
 		try
 		{
 			itk::WriteImage(InverseAffineFixImg, doubleAffinePath + int2string(4, i) + ".nii");
@@ -176,135 +203,11 @@ int main()
 			return EXIT_FAILURE;
 		}
 
-		//还原crop
-
-		//新建一个200*200*50的图像（crop之前的图像大小）
-		ImageType::Pointer canvas = ImageType::New();
-		ImageType::IndexType origin; //创建itk::Index对象,用来指定图像起点位置
-		origin[0] = 0;
-		origin[1] = 0;
-		origin[2] = 0;
-
-		ImageType::SizeType size;   //创建itk::Size对象,指定图像各方向大小
-		size[0] = 200;
-		size[1] = 200;
-		size[2] = 50;
-
-		ImageType::RegionType LargeRegion; //创建图像区域，并设置起点和大小
-		LargeRegion.SetSize(size);
-		LargeRegion.SetIndex(origin);
-
-		canvas->SetRegions(LargeRegion);
-		canvas->Allocate();   //注意：这里才真正给image对象分配内存
-
-
-		//选择一块区域，将图像复制上去
-		const auto startx = static_cast<itk::IndexValueType>(55);
-		const auto endx = static_cast<itk::IndexValueType>(55+77);
-
-		const auto starty = static_cast<itk::IndexValueType>(64);
-		const auto endy = static_cast<itk::IndexValueType>(64+95);
-
-		const auto startz = static_cast<itk::IndexValueType>(0);
-		const auto endz = static_cast<itk::IndexValueType>(50);
-
-		ImageType::IndexType start;
-		start[0] = startx;
-		start[1] = starty;
-		start[2] = startz;
-
-		ImageType::IndexType end;
-		end[0] = endx;
-		end[1] = endy;
-		end[2] = endz;
-
-		ImageType::RegionType region;
-		region.SetIndex(start);
-		region.SetUpperIndex(end);
-
-		using FilterType = itk::PasteImageFilter<ImageType, ImageType>;
-		FilterType::Pointer filter = FilterType::New();
-		filter->SetSourceImage(InverseAffineFixImg);
-		filter->SetSourceRegion(InverseAffineFixImg->GetLargestPossibleRegion());
-		filter->SetDestinationImage(canvas);
-		filter->SetDestinationIndex(start);
-
-		filter->Update();
-		ImageType::Pointer origSizeImage = filter->GetOutput();
-
-		//rotation
-		float rotationAngleYZ = 0;
-		float rotationAngleXY = 60;
-		float yaw = rotationAngleXY * M_PI / 180;
-		float pitch = 0 * M_PI / 180;
-		float roll = rotationAngleYZ * M_PI / 180;
-
-		Eigen::Matrix3f m;
-		m = Eigen::AngleAxisf(roll, Eigen::Vector3f::UnitX()) *   //绕x轴的旋转，YZ平面的旋转
-			Eigen::AngleAxisf(pitch, Eigen::Vector3f::UnitY()) *  //绕y轴的旋转，XZ平面的旋转
-			Eigen::AngleAxisf(yaw, Eigen::Vector3f::UnitZ());		//绕z轴的旋转，XY平面的旋转
-		std::vector<float> rotationMatrix;
-		for (int p = 0; p < m.rows(); p++)
-		{
-			for (int q = 0; q < m.cols(); q++)
-			{
-				rotationMatrix.push_back(m(p, q));
-			}
-		}
-		rotationMatrix.push_back(0);   //平移分量为0
-		rotationMatrix.push_back(0);
-		rotationMatrix.push_back(0);
-
-
-		//先将图像平移到原点为图像中心
-		using ResampleImageFilterType = itk::ResampleImageFilter<ImageType, ImageType>;
-		ResampleImageFilterType::Pointer filter = ResampleImageFilterType::New();
-		resample->SetInput(moving);
-		resample->SetReferenceImage(moving);
-		resample->UseReferenceImageOn();
-		resample->SetSize(moving->GetLargestPossibleRegion().GetSize());
-		resample->SetDefaultPixelValue(0);
-
-		const ImageType::SpacingType & spacing = origSizeImage->GetSpacing();
-		const ImageType::PointType & origin = origSizeImage->GetOrigin();
-		ImageType::SizeType size =
-			origSizeImage->GetLargestPossibleRegion().GetSize();
-
-		using TransformType = itk::AffineTransform<double, Dimension>;
-		TransformType::Pointer transform = TransformType::New();
-		TransformType::OutputVectorType translation1;
-		const double imageCenterX = origin[0] + spacing[0] * size[0] / 2.0;
-		const double imageCenterY = origin[1] + spacing[1] * size[1] / 2.0;
-		const double imageCenterZ = origin[2] + spacing[2] * size[2] / 2.0;
-		translation1[0] = -imageCenterX;
-		translation1[1] = -imageCenterY;
-		translation1[2] = -imageCenterZ;
-		transform->Translate(translation1);
-
-
-
-		ImageType::Pointer origImage = warpImage(origSizeImage, rotationMatrix);
-
-
-		TransformType::OutputVectorType translation2;
-		translation2[0] = imageCenterX;
-		translation2[1] = imageCenterY;
-		translation2[2] = imageCenterZ;
-		transform->Translate(translation2, false);
-
-
-
-		try
-		{
-			itk::WriteImage(origImage, finallyPath + int2string(4, i) + ".nii");
-			std::cout << i << std::endl;
-		}
-		catch (itk::ExceptionObject & error)
-		{
-			std::cerr << "Error: " << error << std::endl;
-			return EXIT_FAILURE;
-		}
 	}
+
+
+	fOut.close();
+	std::cout << "done" << std::endl;
 	return 0;
 }
 
@@ -326,6 +229,9 @@ torch::Tensor convertITKImg2Tensor(itk::Image<float, 3>* img)
 		++it;
 		++buffer_index;
 	}
+
+	
+
 	// convert buffer to tensor
 	//itk  77*95*52
 	//tensor  52*95*77
