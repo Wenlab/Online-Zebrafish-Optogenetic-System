@@ -34,7 +34,7 @@ public:
 	Eigen::Matrix3f rotationMatrix;
 	std::vector<cv::Point3f> regionInFish;   //to galvo
 
-	void initialize();
+	void initialize(std::string filename);
 	void getRegionFromUser(cv::Rect Reg);
 	void getZBB2FixAffineMatrix(std::vector<float> Fix2zbbAM);
 	void getFix2MovingAffineMatrix(std::vector<float> Moving2FixAM);

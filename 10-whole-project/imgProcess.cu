@@ -60,6 +60,33 @@ dim3 grid_sum((PSF_size_1 + block.x - 1) / block.x, (PSF_size_2 + block.y - 1) /
 int ObjRecon_size = 200 * 200 * 50;
 
 
+void FishImageProcess::initialize()
+{
+	//读取PSF和未重构的文件
+	string PSF_1_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/old/PSF_1_zhuanzhi_float.dat";//matlab中保存出来的float类型
+	string X31_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/old/r20210924_2_X31_resize.tif";
+	//读取角度、二维模板信息
+	string rotationAngleXY_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/old/rotationAngleXY.dat";//360个double
+	string rotationAngleYZ_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/old/rotationAngleYZ.dat";//31个double
+	string template_roXY_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/templateXY.tif";//200*200*360个float，按照matlab中行优先存储，存完一个波段再存第二个波段
+	string template_roYZ_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/template_roYZ.dat";//200*50*31个float，按照matlab中行优先存储，存完一个波段再存第二个波段
+	//读取用于仿射对齐的fixImage
+	string fixImage_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/old/toAffineWithZBB.tif";
+
+
+	readPSFfromFile(PSF_1_file);
+	readRotationAngleFromFile(rotationAngleXY_file, rotationAngleYZ_file);
+	readTemplateFromFile(template_roXY_file, template_roYZ_file);
+	readFixImageFromFile(fixImage_file);
+
+	initializeFishReg("anatomyList_4bin.txt");
+
+	prepareGPUMemory();
+	processPSF();
+
+	return;
+}
+
 void FishImageProcess::readPSFfromFile(std::string filename)
 {
 	cout << "start read PSF1 from file..." << endl;
@@ -81,9 +108,17 @@ void FishImageProcess::readPSFfromFile(std::string filename)
 	return;
 }
 
+
+void FishImageProcess::loadImage(unsigned short* imgbuffer)
+{
+	Img = imgbuffer;
+
+	return;
+}
+
 void FishImageProcess::readImageFromFile(std::string filename)
 {
-	cout << "start read image from file" << endl;
+	cout << "read: " << filename << endl;
 	//Img = readImgFromFile(filename);
 	//使用GDAL读取tif，使用的是matlab重采样好的数据
 	GDALAllRegister(); OGRRegisterAll();
@@ -112,7 +147,7 @@ void FishImageProcess::readImageFromFile(std::string filename)
 	//check
 	//cout << Img[512 * 256 + 256] << endl;
 
-	cout << "read image file done" << endl;
+	//cout << "read image file done" << endl;
 
 	return;
 }
@@ -126,13 +161,13 @@ void FishImageProcess::readImageFromCamera(std::string filename)
 void FishImageProcess::readTemplateFromFile(std::string filenameXY, std::string filenameYZ)
 {
 	cout << "start read templates...." << endl;
-	FILE * template_roXY_fid = fopen(filenameXY.data(), "rb");
-	if (template_roXY_fid == NULL)
-	{
-		cout << filenameXY << " open failed!" << endl;
-		system("pause");
-		return;
-	}
+	//FILE * template_roXY_fid = fopen(filenameXY.data(), "rb");
+	//if (template_roXY_fid == NULL)
+	//{
+	//	cout << filenameXY << " open failed!" << endl;
+	//	system("pause");
+	//	return;
+	//}
 	int template_roXY_size = 200 * 200 * 360;
 	template_roXY = new float[template_roXY_size];
 	//fread(template_roXY, sizeof(float), template_roXY_size, template_roXY_fid);
@@ -201,23 +236,41 @@ void FishImageProcess::readFixImageFromFile(std::string filename)
 	float* fixImage = readImgFromFile(filename);
 	//cout << nImgSizeX << "   " << nImgSizeY << "   " << bandcount << endl;
 	fixtensor = torch::from_blob(fixImage,
-		{ int(imgSizeAfterCrop_Z), int(imgSizeAfterCrop_Y), int(imgSizeAfterCrop_X) }).toType(torch::kFloat32);
+		{int(imgSizeAfterCrop_Z), int(imgSizeAfterCrop_Y), int(imgSizeAfterCrop_X) }).toType(torch::kFloat32);
 	fixtensor = normalizeTensor(fixtensor);
 	cout << "read fix image and convert to normalize tensor" << endl;
-	torch::Device device(torch::kCUDA);
+	//torch::Device device(torch::kCUDA);
 	fixtensor.to(device);
 	cout << "copy fix tensor to CUDA" << endl;
 
-	//网络处理第一张图像很慢，提前跑一张
-	model.forward({ fixtensor.to(device),fixtensor.to(device) }).toTensor();
+	//网络处理前几张图像很慢，提前跑一张
+	cout << "warm up..." << endl;
+	for (int i = 0; i < 10; i++)
+	{
+		model.forward({ fixtensor.to(device),fixtensor.to(device) }).toTensor();
+		cout << i << "  " ;
+	}
+	cout << "model process done" << endl;
 
 	return;
 }
 
-//void FishImageProcess::readModelFromFile(std::string filename)
-//{
-//
-//}
+void FishImageProcess::initializeFishReg(std::string filename)
+{
+	FishReg.initialize(filename);
+
+	cv::Rect lightArea(50, 50, 10, 10);
+	FishReg.getRegionFromUser(lightArea);
+
+	vector<float> Fix2ZBBAM{ 0.985154,	0.0184487, -0.00942914,
+	-0.0166061,	1.13246, -0.102937,
+	0.0196408, -0.0078765,	1.25844,
+	0.522241, -6.91866, -11.7296 };
+	FishReg.getZBB2FixAffineMatrix(Fix2ZBBAM);
+
+	return;
+}
+
 
 void FishImageProcess::prepareGPUMemory()
 {
@@ -439,8 +492,10 @@ void FishImageProcess::reconImage()
 	}
 
 
-
-	cout << "重构完成" << endl;
+	if (DEBUG)
+	{
+		cout << "重构完成" << endl;
+	}
 	return;
 }
 
@@ -454,13 +509,15 @@ void FishImageProcess::cropReconImage()
 	////matlab中是从157—356行，总共356-157+1=200行。157-356列，总共356-157+1=200列。
 	int line_start = Nxy / 2 - ROISize; int line_end = Nxy / 2 + ROISize - 1; int line_total = line_end - line_start + 1;
 	int col_start = Nxy / 2 - ROISize; 	int col_end = Nxy / 2 + ROISize - 1; int col_total = col_end - col_start + 1;
-	cout << "line_start: " << line_start <<endl;
-	cout << "line_end: " << line_end << endl;
-	cout << "line_total: " << line_total << endl;
-	cout << "col_start: " << col_start << endl;
-	cout << "col_end: " << col_end << endl;
-	cout << "col_total: " << col_total << endl;
-
+	if (DEBUG)
+	{
+		cout << "line_start: " << line_start << endl;
+		cout << "line_end: " << line_end << endl;
+		cout << "line_total: " << line_total << endl;
+		cout << "col_start: " << col_start << endl;
+		cout << "col_end: " << col_end << endl;
+		cout << "col_total: " << col_total << endl;
+	}
 
 	for (int band = 0; band < PSF_size_3; band++)
 	{
@@ -475,9 +532,11 @@ void FishImageProcess::cropReconImage()
 	//float *gpuObjRecon_crop;   //存储crop后的ObjRecon
 	check(cudaMemcpy(gpuObjRecon_crop, cpuObjRecon_crop, sizeof(float)*ObjRecon_size, cudaMemcpyHostToDevice), "gpuObjRecon_crop cudaMemcpy Error");
 
-
-	//cropReconImage_kernel << <blockNum_123, threadNum_123 >> > (gpuObjRecon, gpuObjRecon_crop);
-	cout << "crop重构出的数据并copy到GPU" << endl;
+	if (DEBUG)
+	{
+		//cropReconImage_kernel << <blockNum_123, threadNum_123 >> > (gpuObjRecon, gpuObjRecon_crop);
+		cout << "crop重构出的数据并copy到GPU" << endl;
+	}
 	return;
 }
 
@@ -485,7 +544,10 @@ void FishImageProcess::cropReconImage()
 void FishImageProcess::matchingANDrotationXY()
 {
 	/*   XY平面的模板匹配和旋转   */
-	cout << "start XY 2D template matching..." << endl;
+	if (DEBUG)
+	{
+		cout << "start XY 2D template matching..." << endl;
+	}
 	dim3 block_1(32, 32, 1);
 	dim3 grid_1((200 + block_1.x - 1) / block_1.x, (200 + block_1.y - 1) / block_1.y, 1);
 	kernel_1 << <grid_1, block_1 >> > (gpuObjRecon_crop, 200, 200, image2D_XY_gpu);   
@@ -494,7 +556,10 @@ void FishImageProcess::matchingANDrotationXY()
 
 	thrust::device_ptr<float> dev_ptr(image2D_XY_gpu);
 	double image2D_XY_mean = thrust::reduce(dev_ptr, dev_ptr + size_t(200 * 200), (float)0, thrust::plus<float>()) / (200 * 200);
-	cout << "image2D_XY_mean: " << image2D_XY_mean << endl;
+	if (DEBUG)
+	{
+		cout << "image2D_XY_mean: " << image2D_XY_mean << endl;
+	}
 
 	int threadNum_2 = 256;
 	int blockNum_2 = (200 * 200 - 1) / threadNum_2 + 1;
@@ -526,9 +591,15 @@ void FishImageProcess::matchingANDrotationXY()
 	//cout << "err_XY_min: " << err_XY_min << endl;
 	//cout << "rotation XY idx: " << idx << endl;
 	//第一次旋转
+	rotationAngleX = -rotationAngleXY[idx];
+	rotationAngleY = 0;
 
-	ObjRecon_imrotate3_gpu(gpuObjRecon_crop, -rotationAngleXY[idx], imageRotated3D_gpu);
-	cout << "XY 2D templaet matching and rotation done" << endl;
+	ObjRecon_imrotate3_gpu(gpuObjRecon_crop, rotationAngleX, imageRotated3D_gpu);
+
+	if (DEBUG)
+	{
+		cout << "XY 2D templaet matching and rotation done" << endl;
+	}
 
 	return;
 }
@@ -664,12 +735,12 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 //}
 
 
-
-
 void FishImageProcess::cropRotatedImage()
 {
-	cout << "start crop rotation image..." << endl;
-
+	if (DEBUG)
+	{
+		cout << "start crop rotation image..." << endl;
+	}
 	//	//计算imageRotated3D_gpu的均值
 	thrust::device_ptr<float> dev_ptr2(imageRotated3D_gpu);
 	double imageRotated3D_x_mean = thrust::reduce(dev_ptr2, dev_ptr2 + size_t(ObjRecon_size), (float)0, thrust::plus<float>()) / (ObjRecon_size)+4;
@@ -706,7 +777,10 @@ void FishImageProcess::cropRotatedImage()
 	CentroID[0] = int(x_sum / idx_2_size + 0.5);
 	CentroID[1] = int(y_sum / idx_2_size + 0.5);
 	CentroID[2] = int(z_sum / idx_2_size + 0.5);
-	cout <<"CentroID: "<< CentroID[0] << "   " << CentroID[1] << "  " << CentroID[2] << endl;
+	if (DEBUG)
+	{
+		cout << "CentroID: " << CentroID[0] << "   " << CentroID[1] << "  " << CentroID[2] << endl;
+	}
 	//CentroID数组在matlab中是[89,91,24]，我计算的是[86,91,24],x相差3，是npp旋转和matlab的结果有误差造成的，误差也不大，算正常！！
 
 	// 保留质心坐标周围的区域，坐标索引在matlab的数上要减去1
@@ -721,6 +795,7 @@ void FishImageProcess::cropRotatedImage()
 		return;
 	}
 
+	cropPoint = cv::Point3d(CentroID[0] - 61, CentroID[1] - 38, 0);
 
 	dim3 block_10(8, 8, 8);
 	dim3 grid_10((imgSizeAfterCrop_X + block_10.x - 1) / block_10.x, (imgSizeAfterCrop_Y + block_10.y - 1) / block_10.y, (imgSizeAfterCrop_Z + block_10.z - 1) / block_10.z);
@@ -728,13 +803,14 @@ void FishImageProcess::cropRotatedImage()
 	kernel_10 << <grid_10, block_10 >> > (imageRotated3D_gpu, ObjCropRed_gpu, imgSizeAfterCrop_X, imgSizeAfterCrop_Y, imgSizeAfterCrop_Z, CentroID[0], CentroID[1]);
 	cudaDeviceSynchronize();
 	checkGPUStatus(cudaGetLastError(), "kernel_10 Error");
-	cout << "crop完成" << endl;
+
+	if (DEBUG)
+	{
+		cout << "crop完成" << endl;
+	}
 
 	return;
 }
-
-
-
 
 
 void FishImageProcess::libtorchModelProcess()
@@ -742,19 +818,29 @@ void FishImageProcess::libtorchModelProcess()
 	//libtorch
 	//convert image to tensor
 	torch::Tensor movingtensor;
+
+
+	//float* temp1 = new float[50 * 95 * 76]();
+	//cudaMemcpy(temp1, ObjCropRed_gpu, sizeof(float) * 50 * 95 * 76, cudaMemcpyDeviceToHost);
+	//movingtensor = torch::from_blob(temp1,
+	//{ int(imgSizeAfterCrop_Z), int(imgSizeAfterCrop_Y), int(imgSizeAfterCrop_X) }).toType(torch::kFloat32);
+
 	movingtensor = torch::from_blob(ObjCropRed_gpu,
 		{ int(imgSizeAfterCrop_Z), int(imgSizeAfterCrop_Y), int(imgSizeAfterCrop_X) }, torch::kCUDA).toType(torch::kFloat32);
 	movingtensor = normalizeTensor(movingtensor);
-	cout << movingtensor.sizes() << endl;
-	cout << fixtensor.sizes() << endl;
-	cout << "1111" << endl;
+	if (DEBUG)
+	{
+		cout << movingtensor.sizes() << endl;
+		cout << fixtensor.sizes() << endl;
+	}
+	//cout << "1111" << endl;
 	auto output = model.forward({ movingtensor.to(device),fixtensor.to(device) }).toTensor();
 	//auto output = model.forward({ movingtensor,fixtensor }).toTensor();
-	cout << "2222" << endl;
-	std::vector<float> Moving2FixAM = rescaleAffineMatrix(output);
+	//cout << "2222" << endl;
+	Moving2FixAM = rescaleAffineMatrix(output);
 
 
-	if (1)
+	if (DEBUG)
 	{
 		cout << Moving2FixAM.size() << endl;
 		for (int aa = 0; aa < Moving2FixAM.size(); aa++)
@@ -762,6 +848,24 @@ void FishImageProcess::libtorchModelProcess()
 			cout << Moving2FixAM[aa] << "   ";
 		}
 	}
+}
+
+
+std::vector<cv::Point3f> FishImageProcess::ZBB2FishTransform()
+{
+	//从rotation/crop/affine的运算过程中获取数据
+	FishReg.getRotationMatrix(rotationAngleX, rotationAngleY);
+	FishReg.getCropPoint(cropPoint);
+	FishReg.getFix2MovingAffineMatrix(Moving2FixAM);
+
+	//cout << endl << "1111" << endl;
+	//坐标转换
+	FishReg.ZBB2FishTransform();
+
+	//cout << "2222" << endl;
+	//获取转化后的坐标
+
+	return FishReg.regionInFish;
 }
 
 
@@ -802,7 +906,7 @@ void FishImageProcess::freeMemory()
 	return;
 }
 
-FishImageProcess::FishImageProcess(const std::string& model_path) :device(torch::kCPU)
+FishImageProcess::FishImageProcess(const std::string& model_path) :device(torch::kCUDA)
 {
 	// is CUDA avaliabel??
 	//torch::DeviceType device_type;
@@ -816,6 +920,14 @@ FishImageProcess::FishImageProcess(const std::string& model_path) :device(torch:
 		device = torch::kCPU;
 		std::cout << "cuda not avaliable" << std::endl;
 	}
+
+
+	torch::Tensor tensor1 = torch::eye(3); // (A) tensor-cpu
+	torch::Tensor tensor2 = torch::eye(3, device); // (B) tensor-cuda
+	std::cout << tensor1 << std::endl;
+	std::cout << tensor2 << std::endl;
+
+
 	try
 	{
 		model = torch::jit::load(model_path);
@@ -825,6 +937,8 @@ FishImageProcess::FishImageProcess(const std::string& model_path) :device(torch:
 		std::cerr << "Error loading the model!\n";
 		std::exit(EXIT_FAILURE);
 	}
+
+	//device = torch::kCUDA;
 	model.eval();
 	model.to(device);
 	std::cout << "load model success" << std::endl;

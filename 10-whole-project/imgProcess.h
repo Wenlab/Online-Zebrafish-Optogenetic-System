@@ -16,6 +16,8 @@
 //坐标转换
 #include"zbb2FishImg.h"
 
+#define DEBUG 0
+
 class FishImageProcess
 {
 public:
@@ -70,7 +72,11 @@ public:
 	float *ObjCropRed_gpu;    //crop结果
 
 	//坐标转换
-	zbb2FishImg coordTrans;
+	int rotationAngleX;
+	int rotationAngleY;
+	cv::Point3d cropPoint;
+	std::vector<float> Moving2FixAM;
+	zbb2FishImg FishReg;
 
 
 	//重构前的图像大小
@@ -90,13 +96,18 @@ public:
 	int template_roXY_size = 200 * 200 * 360;
 	int rotationAngleXY_size = 360;
 
+
+	void initialize();
+
+
 	void readPSFfromFile(std::string filename);
-	void readImageFromFile(std::string filename);   
+	void loadImage(unsigned short * imgbuffer);
+	void readImageFromFile(std::string filename);
 	void readImageFromCamera(std::string filename);
 	void readTemplateFromFile(std::string filenameTemXY, std::string filenameTemYZ);
 	void readRotationAngleFromFile(std::string filenameAngleXY, std::string filenameAngleYZ);
 	void readFixImageFromFile(std::string filename);
-
+	void initializeFishReg(std::string filename);
 	//void readModelFromFile(std::string filename);  //在构造函数处读取
 	
 
@@ -109,7 +120,7 @@ public:
 	//void matchingANDrotationYZ();  //YZ平面的模板匹配和旋转
 	void cropRotatedImage();   //200*200*50  crop成95*76*50
 	void libtorchModelProcess();
-
+	std::vector<cv::Point3f> ZBB2FishTransform();
 
 	void clear();   //清除变量
 	void freeMemory();  //回收内存

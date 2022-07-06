@@ -14,9 +14,9 @@ zbb2FishImg::~zbb2FishImg()
 {
 }
 
-void zbb2FishImg::initialize()
+void zbb2FishImg::initialize(std::string filename)
 {
-	string zbbPath = "anatomyList_4bin.txt";
+	string zbbPath = filename;
 	vector<pair<string, Point>> zbbMapPair;
 	zbbMapPair = readZBBMapFromTxt(zbbPath);
 	zbbMapVec = makeZbbMapVec(zbbMapPair);
@@ -93,6 +93,7 @@ void zbb2FishImg::getRotationMatrix(float rotationAngleZ, float rotationAngleX)
 //使用上面几个函数得到的信息
 void zbb2FishImg::ZBB2FishTransform()
 {
+	//cout << "RegionCoord size " << RegionCoord.size() << endl;
 	for (int i = 0; i < RegionCoord.size(); i++)
 	{
 		Point3f p;
