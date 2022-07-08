@@ -259,9 +259,6 @@ void FishImageProcess::initializeFishReg(std::string filename)
 {
 	FishReg.initialize(filename);
 
-	cv::Rect lightArea(50, 50, 10, 10);
-	FishReg.getRegionFromUser(lightArea);
-
 	vector<float> Fix2ZBBAM{ 0.985154,	0.0184487, -0.00942914,
 	-0.0166061,	1.13246, -0.102937,
 	0.0196408, -0.0078765,	1.25844,
@@ -851,8 +848,11 @@ void FishImageProcess::libtorchModelProcess()
 }
 
 
-std::vector<cv::Point3f> FishImageProcess::ZBB2FishTransform()
+std::vector<cv::Point3f> FishImageProcess::ZBB2FishTransform(cv::Rect roi)
 {
+
+	//cv::Rect lightArea(50, 50, 10, 10);
+	FishReg.getRegionFromUser(roi);
 	//从rotation/crop/affine的运算过程中获取数据
 	FishReg.getRotationMatrix(rotationAngleX, rotationAngleY);
 	FishReg.getCropPoint(cropPoint);
@@ -860,12 +860,12 @@ std::vector<cv::Point3f> FishImageProcess::ZBB2FishTransform()
 
 	//cout << endl << "1111" << endl;
 	//坐标转换
-	FishReg.ZBB2FishTransform();
+	std::vector<cv::Point3f> regionInFish = FishReg.ZBB2FishTransform();
 
-	//cout << "2222" << endl;
-	//获取转化后的坐标
+	
+	FishReg.clear();
 
-	return FishReg.regionInFish;
+	return regionInFish;
 }
 
 

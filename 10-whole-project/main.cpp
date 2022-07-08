@@ -23,8 +23,12 @@ int main()
 
 	myExp.initialize();
 
+	myExp.setupGUI();
+
 	for (int i = 0; i < beforeResizeImgNames.size(); i++)
 	{
+		myExp.getParamsFromGUI();
+
 		myExp.readFullSizeImgFromFile(beforeResizeImgNames[i]);
 		myExp.resizeImg();
 		myExp.saveImg2Disk(afterResizeImgPath + int2string(4, i) + ".tif");
@@ -32,8 +36,12 @@ int main()
 
 		myExp.ImgReconAndRegis();
 
+		myExp.getReconMIP();
 
+		//cv::imshow("test",myExp.MIP);
+		myExp.drawGUIimg();
 
+		cv::waitKey(1);
 
 		////save and check
 		//string saveName1 = "D:/kexin/Online-Zebrafish-Optogenetic/data/testRecon/" + int2string(4, i) + ".tif";

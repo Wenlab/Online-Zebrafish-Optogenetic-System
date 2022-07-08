@@ -120,7 +120,7 @@ public:
 	//void matchingANDrotationYZ();  //YZ平面的模板匹配和旋转
 	void cropRotatedImage();   //200*200*50  crop成95*76*50
 	void libtorchModelProcess();
-	std::vector<cv::Point3f> ZBB2FishTransform();
+	std::vector<cv::Point3f> ZBB2FishTransform(cv::Rect roi);
 
 	void clear();   //清除变量
 	void freeMemory();  //回收内存

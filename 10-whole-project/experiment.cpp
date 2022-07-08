@@ -31,6 +31,9 @@ void Experiment::initialize()
 	fishImgProc.initialize();
 	cout << "initialize fishImgProc done" << endl;
 
+	MIP = cv::Mat(200, 200, CV_32FC1);
+
+
 	return;
 }
 
@@ -101,7 +104,7 @@ void Experiment::ImgReconAndRegis()
 	////crop的结果构建movingTensor，和fixTensor一起送入网络处理
 	fishImgProc.libtorchModelProcess();
 	////结合rotation/crop/affine的数据做坐标转换
-	std::vector<cv::Point3f> points = fishImgProc.ZBB2FishTransform();
+	ROIpoints = fishImgProc.ZBB2FishTransform(roi);
 
 	return;
 }
@@ -138,4 +141,92 @@ void Experiment::saveImg2Disk(string filename)
 
 void Experiment::getReconMIP()
 {
+	float* temp = new float[200 * 200 * 1];
+	cudaMemcpy(temp, fishImgProc.image2D_XY_gpu, sizeof(float) * 200 * 200 * 1, cudaMemcpyDeviceToHost);
+	MIP = cv::Mat(200, 200, CV_32FC1, temp);
+
+	cv::normalize(MIP, MIP, 0, 1, cv::NormTypes::NORM_MINMAX);
+
+	return;
 }
+
+void Experiment::setupGUI()
+{
+	//set up GUI
+	cout << "creating control panel for optogenetic..." << endl;
+	cv::namedWindow("Control Panel for Optogenetic", cv::WINDOW_NORMAL);
+	cv::resizeWindow("Control Panel for Optogenetic", 600, 400);
+
+	cv::createTrackbar("recordOn", "Control Panel for Optogenetic", &recordOn, 1);
+	cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
+	cv::createTrackbar("ScanTime", "Control Panel for Optogenetic", &params.laserTime, 5000);
+	cv::createTrackbar("xsize", "Control Panel for Optogenetic", &params.xsize, 20);
+	cv::createTrackbar("ysize", "Control Panel for Optogenetic", &params.ysize, 20);
+	cv::createTrackbar("xpos", "Control Panel for Optogenetic", &params.xpos, 50);
+	cv::createTrackbar("ypos", "Control Panel for Optogenetic", &params.ypos, 50);
+	cv::createTrackbar("Stop", "Control Panel for Optogenetic", &UserWantToStop, 1);
+	
+	cv::waitKey(1);
+	return;
+}
+
+
+void Experiment::getParamsFromGUI()
+{
+	//refresh GalvoOn
+	//cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
+	//get params from GUI
+	recordOn = cv::getTrackbarPos("recordOn", "Control Panel for Optogenetic");
+	params.laserOn = cv::getTrackbarPos("LaserOn", "Control Panel for Optogenetic");
+	params.laserTime = cv::getTrackbarPos("ScanTime", "Control Panel for Optogenetic");
+	params.xsize = cv::getTrackbarPos("xsize", "Control Panel for Optogenetic");
+	params.ysize = cv::getTrackbarPos("ysize", "Control Panel for Optogenetic");
+	params.xpos = cv::getTrackbarPos("xpos", "Control Panel for Optogenetic");
+	params.ypos = cv::getTrackbarPos("ypos", "Control Panel for Optogenetic");
+
+	UserWantToStop = cv::getTrackbarPos("Stop", "Control Panel for Optogenetic");
+
+	roi = cv::Rect(params.xpos, params.ypos, params.xsize, params.ysize);
+
+	cv::waitKey(1);
+	return;
+}
+
+
+void Experiment::drawGUIimg()
+{
+
+	ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
+
+	cv::rectangle(ref, roi, cv::Scalar(255), 2);
+
+	ref_MIP = cv::Mat(200, 400, CV_8UC1, cv::Scalar(0));
+	cv::resize(ref, ref_resize, cv::Size(ref.cols * 2, ref.rows * 2));
+
+	cv::Mat refROI = ref_MIP(cv::Rect(0, 0, ref_resize.cols, ref_resize.rows));
+	ref_resize.copyTo(refROI);
+
+	cv::Mat MIP_8u = MIP.clone();
+	MIP_8u = (MIP_8u * 255);
+	MIP_8u.convertTo(MIP_8u, CV_8UC1);
+
+	for (int i = 0; i < ROIpoints.size(); i++)
+	{
+		cv::Point3f p = ROIpoints[i];
+		cv::circle(MIP_8u, cv::Point(p.x, p.y), 1, cv::Scalar(255));
+	}
+
+
+	cv::Mat MIPROI = ref_MIP(cv::Rect(200, 0, MIP_8u.cols, MIP_8u.rows));
+	MIP_8u.copyTo(MIPROI);
+
+	cv::Mat ref_mip_resize;
+	cv::resize(ref_MIP, ref_mip_resize, cv::Size(ref_MIP.cols * 2, ref_MIP.rows * 2));
+
+	cv::imshow("test", ref_mip_resize);
+
+	cv::waitKey(1);
+
+	return;
+}
+
