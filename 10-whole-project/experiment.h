@@ -1,5 +1,6 @@
 #pragma once
 #include"imgProcess.h"
+#include"Talk2Camera.h"
 
 #include<opencv2/opencv.hpp>
 #include<opencv2/highgui/highgui.hpp>
@@ -25,6 +26,11 @@ public:
 
 	unsigned short int *Image;
 	unsigned short int *Image4bin;
+
+	//cameras
+	AT_H cam_handle; //相机句柄变量的声明,随后将再初始化时为其赋值,之后用它来传递相机信息
+	CamData* cam_data;
+
 
 
 	OptogeneticParams params;

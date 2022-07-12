@@ -30,7 +30,8 @@ int main()
 	myExp.initialize();
 
 
-	thread cameraGrabLoopThread(&Experiment::readFullSizeImgFromFile, &myExp);
+	//thread cameraGrabLoopThread(&Experiment::readFullSizeImgFromFile, &myExp);   //文件接口
+	thread cameraGrabLoopThread(&Experiment::readFullSizeImgFromCamera, &myExp);   //相机接口
 	thread imgProcessLoopThread(&Experiment::imgProcess, &myExp);
 	thread writeOutLoopThread(&Experiment::writeOutData, &myExp);
 	thread galvoControlThread(&Experiment::galvoControl, &myExp);

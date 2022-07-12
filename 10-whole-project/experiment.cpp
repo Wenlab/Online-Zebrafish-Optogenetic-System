@@ -33,6 +33,16 @@ void Experiment::initialize()
 	Image = new unsigned short int[2048 * 2048 * 1];  //开辟缓存区
 	Image4bin = new unsigned short int[512 * 512 * 1];
 
+	//初始化相机
+	cam_data = T2Cam_CreateCamData(); //动态申请CamData结构体的空间,创建指向该空间的cam_data指针
+	T2Cam_InitializeLib(&cam_handle);
+	SetupBinningandAOI(cam_handle);
+	T2Cam_InitializeCamData(cam_data, cam_handle);
+	getUserSettings(cam_handle);
+	CreateBuffer(cam_data, cam_handle);
+	cout << "camera prepare done" << endl;
+
+
 	fishImgProc.initialize();
 	cout << "initialize fishImgProc done" << endl;
 
@@ -113,10 +123,30 @@ void Experiment::readFullSizeImgFromFile()
 	return;
 }
 
+
 void Experiment::readFullSizeImgFromCamera()
 {
+	//Start Acquisition
+	T2Cam_StartAcquisition(cam_handle);
+	while (!UserWantToStop)
+	{
+		if (T2Cam_GrabFrame(cam_data, cam_handle) == 0)
+		{
+			memcpy(Image, cam_data->ImageRawData, CCDSIZEX *CCDSIZEY * sizeof(unsigned short));
+		}
+		else
+		{
+			cout << "Error in imaging acquisition!" << endl;
+			break;
+		}
+	}
 
+	AT_Command(cam_handle, L"AcquisitionStop");
+	cout << endl << endl;
+
+	return;
 }
+
 
 void Experiment::resizeImg()
 {
@@ -375,6 +405,8 @@ void Experiment::controlExp()
 				params.laserOn = 0;
 				time.stop();
 				timerStart = false;
+				cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
+
 			}
 		}
 
@@ -397,7 +429,6 @@ void Experiment::galvoControl()
 		{
 			
 		}
-		cout << "1111" << endl;
 	}
 
 	cout << "galvo thread say goodbye!!" << endl;
@@ -414,6 +445,11 @@ void Experiment::clear()
 	free(Image4bin);
 
 	cv::destroyAllWindows();
+
+	//相机, SDK, 释放内存
+	//Camera and Libs
+	T2Cam_TurnOff(cam_data, cam_handle);
+	T2Cam_CloseLib();
 
 	cout << "clear exp" << endl;
 	return;
