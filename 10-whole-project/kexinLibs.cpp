@@ -237,3 +237,17 @@ std::string int2string(int n, int i)
 	}
 }
 
+std::string getTime()
+{
+	time_t nowtime;
+	nowtime = time(NULL);
+
+	tm local;
+	localtime_s(&local, &nowtime);
+
+	char buf[80];
+	strftime(buf, 80, "%Y%m%d_%H%M", &local);
+	cout << buf << endl;
+	std::string time = buf;
+	return time;
+}

@@ -1,9 +1,17 @@
 #include"experiment.h"
-
+#include"kexinLibs.h"
 #include "gdal_priv.h"
 #include <gdal.h>
 
+#include"Timer.h"
+
+#include  <io.h>  
+#include  <stdio.h>  
+#include  <stdlib.h> 
+
 #include"avir.h"
+
+#include <opencv2/core/utils/logger.hpp>
 
 using namespace std;
 
@@ -17,64 +25,92 @@ Experiment::~Experiment()
 
 }
 
-void Experiment::prepareMemory()
-{
-	Image = new unsigned short int[2048*2048*1];  //开辟缓存区
-	Image4bin = new unsigned short int[512 * 512 * 1];
-
-
-	return;
-}
 
 void Experiment::initialize()
 {
+	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);  //关闭opencv的警告
+
+	Image = new unsigned short int[2048 * 2048 * 1];  //开辟缓存区
+	Image4bin = new unsigned short int[512 * 512 * 1];
+
 	fishImgProc.initialize();
 	cout << "initialize fishImgProc done" << endl;
 
 	MIP = cv::Mat(200, 200, CV_32FC1);
 
+	initializeWriteOut();
+	cout << "write out prepare done" << endl;
+	setupGUI();
+	cout << "GUI prepare done" << endl;
+
+	frameNum = 0;
+	recordOn = 0;
+	UserWantToStop = 0;
 
 	return;
 }
 
-void Experiment::readFullSizeImgFromFile(string filename)
+void Experiment::readFullSizeImgFromFile()
 {
-	GDALDataset *poDataset;   //GDAL数据集
-	poDataset = (GDALDataset *)GDALOpen(filename.data(), GA_ReadOnly);
-	if (poDataset == NULL)
+	cout << "read Image thread say hello!!" << endl;
+
+	string beforeResizeImgPath = "D:/kexin/Online-Zebrafish-Optogenetic/data/r20210824_X10";
+	vector<string> beforeResizeImgNames;
+	getFileNames(beforeResizeImgPath, beforeResizeImgNames);
+
+	while (!UserWantToStop)
 	{
-		cout << "fail in open files!!!" << endl;
-		return;
-	}
-	int nImgSizeX = poDataset->GetRasterXSize();
-	int nImgSizeY = poDataset->GetRasterYSize();
-	GDALRasterBand *poBand;
-	int bandcount = poDataset->GetRasterCount();	// 获取波段数
-	//unsigned short int *Image = new unsigned short int[nImgSizeX*nImgSizeY*bandcount];  //开辟缓存区
-	if (DEBUG)
-	{
-		cout << nImgSizeX << "  *  " << nImgSizeY << endl;
-		cout << "波段数：" << bandcount << endl;
-	}
-	int num_iamge_size = 0;
-	for (int bandind = 1; bandind <= bandcount; bandind++)
-	{
-		poBand = poDataset->GetRasterBand(bandind);
-		unsigned short int *pafScanline = new unsigned short int[nImgSizeX*nImgSizeY];
-		poBand->RasterIO(GF_Read, 0, 0, nImgSizeX, nImgSizeY, pafScanline, nImgSizeX, nImgSizeY, GDALDataType(poBand->GetRasterDataType()), 0, 0);
-		for (int i = 0; i < nImgSizeX; i++)
+		string filename = beforeResizeImgNames[frameNum];
+		GDALDataset *poDataset;   //GDAL数据集
+		poDataset = (GDALDataset *)GDALOpen(filename.data(), GA_ReadOnly);
+		if (poDataset == NULL)
 		{
-			for (int j = 0; j < nImgSizeY; j++)
+			cout << "fail in open files!!!" << endl;
+			return;
+		}
+		int nImgSizeX = poDataset->GetRasterXSize();
+		int nImgSizeY = poDataset->GetRasterYSize();
+		GDALRasterBand *poBand;
+		int bandcount = poDataset->GetRasterCount();	// 获取波段数
+		//unsigned short int *Image = new unsigned short int[nImgSizeX*nImgSizeY*bandcount];  //开辟缓存区
+		if (DEBUG)
+		{
+			cout << nImgSizeX << "  *  " << nImgSizeY << endl;
+			cout << "波段数：" << bandcount << endl;
+		}
+		int num_iamge_size = 0;
+		for (int bandind = 1; bandind <= bandcount; bandind++)
+		{
+			poBand = poDataset->GetRasterBand(bandind);
+			unsigned short int *pafScanline = new unsigned short int[nImgSizeX*nImgSizeY];
+			poBand->RasterIO(GF_Read, 0, 0, nImgSizeX, nImgSizeY, pafScanline, nImgSizeX, nImgSizeY, GDALDataType(poBand->GetRasterDataType()), 0, 0);
+			for (int i = 0; i < nImgSizeX; i++)
 			{
-				num_iamge_size++;
-				Image[(bandind - 1) * nImgSizeX * nImgSizeY + i * nImgSizeY + j] = unsigned short int(pafScanline[i*nImgSizeY + j]);
-				//cout << Image[(bandind - 1) * nImgSizeX * nImgSizeY + i * nImgSizeY + j] << endl;
+				for (int j = 0; j < nImgSizeY; j++)
+				{
+					num_iamge_size++;
+					Image[(bandind - 1) * nImgSizeX * nImgSizeY + i * nImgSizeY + j] = unsigned short int(pafScanline[i*nImgSizeY + j]);
+					//cout << Image[(bandind - 1) * nImgSizeX * nImgSizeY + i * nImgSizeY + j] << endl;
+				}
 			}
+
 		}
 
+		resizeImg();
+		cout << "read img done: " << filename << endl;
+		frameNum = frameNum + 1;
+
+		if (frameNum >= beforeResizeImgNames.size()-1)
+		{
+			UserWantToStop = 1;
+			break;
+		}
 	}
 
-	cout << "read img done: " << filename << endl;
+	cout << "read Image thread say goodbye!!" << endl;
+
+
+	return;
 }
 
 void Experiment::readFullSizeImgFromCamera()
@@ -162,8 +198,8 @@ void Experiment::setupGUI()
 	cv::createTrackbar("ScanTime", "Control Panel for Optogenetic", &params.laserTime, 5000);
 	cv::createTrackbar("xsize", "Control Panel for Optogenetic", &params.xsize, 20);
 	cv::createTrackbar("ysize", "Control Panel for Optogenetic", &params.ysize, 20);
-	cv::createTrackbar("xpos", "Control Panel for Optogenetic", &params.xpos, 50);
-	cv::createTrackbar("ypos", "Control Panel for Optogenetic", &params.ypos, 50);
+	cv::createTrackbar("xpos", "Control Panel for Optogenetic", &params.xpos, 76);
+	cv::createTrackbar("ypos", "Control Panel for Optogenetic", &params.ypos, 95);
 	cv::createTrackbar("Stop", "Control Panel for Optogenetic", &UserWantToStop, 1);
 	
 	cv::waitKey(1);
@@ -186,9 +222,15 @@ void Experiment::getParamsFromGUI()
 
 	UserWantToStop = cv::getTrackbarPos("Stop", "Control Panel for Optogenetic");
 
+
+	//防止越界
+	if ((params.xpos + params.xsize) > 76)
+		params.xsize = 76 - params.xpos;
+	if ((params.ypos + params.ysize) > 95)
+		params.ysize = 95 - params.ypos;
 	roi = cv::Rect(params.xpos, params.ypos, params.xsize, params.ysize);
 
-	cv::waitKey(1);
+	//cv::waitKey(1);
 	return;
 }
 
@@ -196,37 +238,190 @@ void Experiment::getParamsFromGUI()
 void Experiment::drawGUIimg()
 {
 
-	ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
-
-	cv::rectangle(ref, roi, cv::Scalar(255), 2);
-
 	ref_MIP = cv::Mat(200, 400, CV_8UC1, cv::Scalar(0));
-	cv::resize(ref, ref_resize, cv::Size(ref.cols * 2, ref.rows * 2));
 
+
+	//准备reference图像，ZBB
+	ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
+	cv::rectangle(ref, roi, cv::Scalar(255), 2);
+	cv::resize(ref, ref_resize, cv::Size(ref.cols * 2, ref.rows * 2));
 	cv::Mat refROI = ref_MIP(cv::Rect(0, 0, ref_resize.cols, ref_resize.rows));
 	ref_resize.copyTo(refROI);
 
+
+	//准备当前帧的MIP
 	cv::Mat MIP_8u = MIP.clone();
 	MIP_8u = (MIP_8u * 255);
 	MIP_8u.convertTo(MIP_8u, CV_8UC1);
-
 	for (int i = 0; i < ROIpoints.size(); i++)
 	{
 		cv::Point3f p = ROIpoints[i];
 		cv::circle(MIP_8u, cv::Point(p.x, p.y), 1, cv::Scalar(255));
 	}
-
-
 	cv::Mat MIPROI = ref_MIP(cv::Rect(200, 0, MIP_8u.cols, MIP_8u.rows));
 	MIP_8u.copyTo(MIPROI);
+
 
 	cv::Mat ref_mip_resize;
 	cv::resize(ref_MIP, ref_mip_resize, cv::Size(ref_MIP.cols * 2, ref_MIP.rows * 2));
 
 	cv::imshow("test", ref_mip_resize);
 
-	cv::waitKey(1);
+	//cv::waitKey(1);
 
 	return;
 }
 
+
+void Experiment::initializeWriteOut()
+{
+	string path = "D:/kexin/Online-Zebrafish-Optogenetic/data/testWriteOut/";
+	// change to you own data path
+	string time = getTime();
+	string fishtype;
+	string fishage;
+	cout << "please input fish type" << endl;
+	cin >> fishtype;
+	cout << "please input fish age (e.g: 9)" << endl;
+	cin >> fishage;
+
+	folderName = path + time + "_" + fishtype + "_" + fishage + "dpf" + "/";
+	int ret = _access(folderName.c_str(), 0);
+	if (ret != 0)
+	{
+		_mkdir(folderName.c_str());
+	}
+
+	txtName = path + time + "_" + fishtype + "_" + fishage + "dpf" + ".txt";
+	outTXT.open(txtName);
+
+	return;
+}
+
+void Experiment::writeOutTxt()
+{
+	outTXT << "frameNum:" << frameNum << endl;
+	outTXT << "laserOn:" << params.laserOn << ", xsize:" << params.xsize << ", xpos:" << params.xpos
+		<< ", ysize:" << params.ysize << ", ypos:" << params.ypos << endl;
+	outTXT << "rotationAngleX:" << fishImgProc.rotationAngleX << endl;
+	outTXT << "rotationAngleY:" << fishImgProc.rotationAngleY << endl;
+	outTXT << "cropPoint:" << fishImgProc.cropPoint << endl;
+	outTXT << "Moving2FixAffineMatrix:";
+	for (int i = 0; i < fishImgProc.Moving2FixAM.size(); i++)
+	{
+		outTXT << fishImgProc.Moving2FixAM[i] << "    ";
+	}
+	outTXT << endl << endl;
+}
+
+
+void Experiment::writeOutData()
+{
+	cout << "write out thread say hello :p" << endl;
+
+	int frameCount_writeOut = 0;
+	while (!UserWantToStop)
+	{
+		if (frameCount_writeOut != frameNum)
+		{
+			saveImg2Disk(folderName + "/" + int2string(6, frameNum) + ".tif");
+			writeOutTxt();
+			frameCount_writeOut = frameNum;
+		}
+	}
+
+	cout << "write out thread say goodbye!!" << endl;
+	return;
+}
+
+void Experiment::imgProcess()
+{
+	cout << "Image recon and regis thread Say Hello!! :)" << endl;
+
+	int frameCount_imgprocess = 0;
+	while (!UserWantToStop)
+	{
+		if (frameCount_imgprocess != frameNum)
+		{
+			ImgReconAndRegis();
+			getReconMIP();
+			frameCount_imgprocess = frameNum;
+		}
+
+	}
+	cout << "Image recon and regis thread say goodbye!!" << endl;
+	return;
+}
+
+void Experiment::controlExp()
+{
+	Timer time;
+	bool timerStart = false;
+	while (!UserWantToStop)
+	{
+		getParamsFromGUI();
+		drawGUIimg();
+
+		if (params.laserOn)
+		{
+			if (!timerStart)
+			{
+				time.start();
+				timerStart = true;
+			}
+
+			if (time.getElapsedTimeInMilliSec() > params.laserTime)
+			{
+				params.laserOn = 0;
+				time.stop();
+				timerStart = false;
+			}
+		}
+
+		cv::waitKey(1);
+	}
+
+	cout << "control thread say goodbye" << endl;
+
+	return;
+}
+
+
+
+void Experiment::galvoControl()
+{
+	cout << "I'm galvo thread." << endl;
+	while (!UserWantToStop)
+	{
+		if (params.laserOn)
+		{
+			
+		}
+		cout << "1111" << endl;
+	}
+
+	cout << "galvo thread say goodbye!!" << endl;
+
+	return;
+}
+
+void Experiment::clear()
+{
+	outTXT.close();
+	fishImgProc.freeMemory();
+
+	free(Image);
+	free(Image4bin);
+
+	cv::destroyAllWindows();
+
+	cout << "clear exp" << endl;
+	return;
+}
+
+
+void Experiment::exit()
+{
+	exit();
+	return;
+}

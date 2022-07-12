@@ -22,3 +22,4 @@ torch::Tensor normalizeTensor(torch::Tensor tensor);   //将tensor归一化为0~1
 void saveAndCheckImage(float* imageData, int col_total, int row_total, int z_total, std::string name);   //存储图像为tiff格式
 void getFileNames(std::string path, std::vector<std::string>& files);   //获取文件夹下所有文件名
 std::string int2string(int n, int i);  //数字转字符，指定长度，如0001
+std::string getTime();  //获取当前时间，YYYYMMDD_HHMM, eg: 20220711_0926

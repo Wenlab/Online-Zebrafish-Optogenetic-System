@@ -873,6 +873,7 @@ std::vector<cv::Point3f> FishImageProcess::ZBB2FishTransform(cv::Rect roi)
 
 void FishImageProcess::clear()
 {
+	
 	return;
 }
 

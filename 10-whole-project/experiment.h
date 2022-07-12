@@ -6,6 +6,8 @@
 #include<opencv2/core/core.hpp>
 #include<opencv2/imgproc/imgproc.hpp>
 
+
+
 struct OptogeneticParams
 {
 	int xsize = 10;
@@ -19,14 +21,15 @@ struct OptogeneticParams
 class Experiment
 {
 public:
+	int frameNum;
 
 	unsigned short int *Image;
 	unsigned short int *Image4bin;
 
 
 	OptogeneticParams params;
-	int recordOn = 0;
-	int UserWantToStop = 0;
+	int recordOn;
+	int UserWantToStop;
 
 	cv::Rect roi;//用户在ref上选的给光区域
 	std::vector<cv::Point3f> ROIpoints;//坐标转换到鱼身上的点
@@ -42,10 +45,12 @@ public:
 
 	FishImageProcess fishImgProc;
 
-	void prepareMemory();
+	//write out
+	std::string folderName;
+	std::string txtName;
+	std::ofstream outTXT;
+
 	void initialize();
-	void readFullSizeImgFromFile(std::string filename);
-	void readFullSizeImgFromCamera();
 	void resizeImg();
 	void ImgReconAndRegis();
 	void saveImg2Disk(std::string filename);
@@ -56,6 +61,21 @@ public:
 	void getParamsFromGUI();
 	void drawGUIimg();
 
+	void initializeWriteOut();
+	void writeOutTxt();
+	
+	void controlExp();
+
+
+	void clear();
+	void exit();
+
+	//线程函数
+	void writeOutData();
+	void imgProcess();
+	void galvoControl();
+	void readFullSizeImgFromFile();
+	void readFullSizeImgFromCamera();
 
 private:
 
