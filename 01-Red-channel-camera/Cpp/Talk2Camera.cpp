@@ -90,7 +90,8 @@ int T2Cam_InitializeLib(int* Hndl) {
     		AT_GetInt(AT_HANDLE_SYSTEM, L"DeviceCount", &iNumberDevices);
     	    cout << iNumberDevices << " cameras detected. " << endl;
             
-            if (iNumberDevices <= 0) {
+            if (iNumberDevices <= 0) 
+			{
       			cout << "No cameras detected"<<endl;
     		}
     	
@@ -98,7 +99,8 @@ int T2Cam_InitializeLib(int* Hndl) {
       				
       			i_retCode = AT_Open(0, Hndl);
 
-      			if (i_retCode != AT_SUCCESS) {
+      			if (i_retCode != AT_SUCCESS) 
+				{
         			cout << "Error condition, could not initialise camera" << endl << endl;
       			}
 
@@ -127,7 +129,6 @@ int T2Cam_InitializeLib(int* Hndl) {
                         wcout<<"Cannot Set Pixel Encoding to " << CCDENCODING <<endl<<endl;
                     }
         			
-        			//int iret = AT_SetEnumeratedString(Hndl, L"TriggerMode",L"Software");
 
         			int iret = AT_SetEnumeratedString(*Hndl, L"TriggerMode",L"Internal");
         			if (iret != AT_SUCCESS ) {
@@ -148,8 +149,8 @@ int T2Cam_InitializeLib(int* Hndl) {
           				cout << "CycleMode set to Continuous" << endl << endl;
         			}
 
-					cout << "cooling..." << endl;
-					SetupSensorCooling(*Hndl);
+					//cout << "cooling..." << endl;
+					//SetupSensorCooling(*Hndl);
 
 					//set simple preAmpGainControl
 					//set sensitivity/dynamic range to 16-bit (low noise & high well capacity)
@@ -273,7 +274,7 @@ int T2Cam_GrabFrame(CamData* MyCamera, int _handle) {
 
     /*unsigned char** ppBuf=&pBuf;
     int* pBufSize = &BufSize;*/
-    iret = AT_WaitBuffer(_handle, &pBuf, &BufSize, 10000);
+    iret = AT_WaitBuffer(_handle, &pBuf, &BufSize, AT_INFINITE);   //AT_INFINITE  一直等待至队列中有数据
     if (iret!=AT_SUCCESS){
       cout << "Error:Acquisition timeout when not expecting, retcode " << iret << endl;
       return -1;
@@ -408,7 +409,7 @@ int getUserSettings(int _handle){
 	cin >> i_trigger;
 	if (i_trigger == 0)
 	{
-		i_retCode= AT_SetEnumString(_handle,L"TriggerMode", L"External");
+		i_retCode= AT_SetEnumString(_handle,L"TriggerMode", L"External Exposure");
 	}
 	else
 	{
@@ -422,8 +423,9 @@ int getUserSettings(int _handle){
 
     //Set Readout Rate
     cout << endl << "Enter the pixel Readout rate, 100, 200, 270 or 540." << endl;
-    int i_rate;
-    cin >> i_rate;
+    int i_rate = 270;
+    //cin >> i_rate;
+	cout << "set pixel readout rate to: " << i_rate << endl;
     if (i_rate == 100) {
         i_retCode = AT_SetEnumIndex(_handle, L"PixelReadoutRate", 1);
     }
@@ -452,93 +454,84 @@ int getUserSettings(int _handle){
     cout << "Error getting PixelReadoutRate string " << i_retCode << endl << endl;
     }
     wcout << "PixelReadoutRate set to " << szValue << endl;
-    //i_retCode = AT_GetEnumStringByIndex(_handle, L"PixelReadoutRate", 0, szValue, 64);
-    //wcout << "Index 0: " << szValue << endl;
-    //i_retCode = AT_GetEnumStringByIndex(_handle, L"PixelReadoutRate", 1, szValue, 64);
-    //wcout << "Index 1: " << szValue << endl;
-    //i_retCode = AT_GetEnumStringByIndex(_handle, L"PixelReadoutRate", 2, szValue, 64);
-    //wcout << "Index 2: " << szValue << endl;
-    //i_retCode = AT_GetEnumStringByIndex(_handle, L"PixelReadoutRate", 3, szValue, 64);
-    //wcout << "Index 3: " << szValue << endl;
 
-    //Set exposure time
-    cout << endl << "Enter the Exposure time in seconds, eg 0.009." << endl;
-    float f_exp;
-    cin >> f_exp;
+	//Set overlap mode
+	AT_BOOL overlapMode = false;
+	cout << endl << "Choose the overlap readout mode, 0 or 1." << endl;
+	cin >> overlapMode;
 
-    i_retCode = AT_SetFloat(_handle, L"ExposureTime", f_exp);
-    if (i_retCode != AT_SUCCESS) {
-    cout << "Error setting Exposure time to " << f_exp << " Error code "<< i_retCode << endl << endl;
-    }
+	i_retCode = AT_SetBool(_handle, L"Overlap", overlapMode);
+	if (i_retCode != AT_SUCCESS) {
+		cout << "Error setting Overlap Mode to " << boolalpha << overlapMode << " Error code " << i_retCode << endl << endl;
+	}
 
-    //Check exposure time
-    double d_actual;
-    i_retCode = AT_GetFloat(_handle, L"ExposureTime", &d_actual);
-    if (i_retCode != AT_SUCCESS) {
-    cout << "Error getting Exposure time, Error code "<< i_retCode << endl << endl;
-    }
-    cout << "Exposure time set to " << d_actual << " second(s)" << endl;
-
-    //Set overlap mode
-    AT_BOOL overlapMode = false;
-    cout << endl << "Choose the overlap readout mode, 0 or 1." << endl;
-    cin >> overlapMode;
-
-    i_retCode = AT_SetBool(_handle, L"Overlap", overlapMode);
-    if (i_retCode != AT_SUCCESS) {
-        cout << "Error setting Overlap Mode to " << boolalpha << overlapMode << " Error code " << i_retCode << endl << endl;
-    }
-
-    //Check overlap mode
-    AT_BOOL overlapMode_actual;
-    i_retCode = AT_GetBool(_handle, L"Overlap", &overlapMode_actual);
-    if (i_retCode != AT_SUCCESS) {
-        cout << "Error getting Overlap Mode, Error code " << i_retCode << endl << endl;
-    }
-    cout << "Overlap Mode set to " << boolalpha << (bool)overlapMode_actual << endl;
+	//Check overlap mode
+	AT_BOOL overlapMode_actual;
+	i_retCode = AT_GetBool(_handle, L"Overlap", &overlapMode_actual);
+	if (i_retCode != AT_SUCCESS) {
+		cout << "Error getting Overlap Mode, Error code " << i_retCode << endl << endl;
+	}
+	cout << "Overlap Mode set to " << boolalpha << (bool)overlapMode_actual << endl;
 
 
-    //Get FrameRate range
-    double fps_max = 0;
-    double fps_min = 0;
-    AT_GetFloatMax(_handle, L"FrameRate", &fps_max);
-    AT_GetFloatMin(_handle, L"FrameRate", &fps_min);
-    cout << endl << "You can set Frame Rate between "<< fps_min  << " and " << fps_max << " ." << endl;
-    
-    //Set FrameRate
-    double fps = 100;
-    cout << endl << "Enter the Frame Rate in fps, e.g. 100." << endl;
-    cin >> fps;
 
-    i_retCode = AT_SetFloat(_handle, L"FrameRate",fps);
-    if (i_retCode != AT_SUCCESS) {
-        cout << "Error setting FrameRate to " << fps << " Error code " << i_retCode << endl << endl;
-    }
+	//if software trigger
+	if (i_trigger == 1)
+	{
+		//Set exposure time
+		cout << endl << "Enter the Exposure time in seconds, eg 0.009." << endl;
+		float f_exp = 0.1;
+		//cin >> f_exp;
+		cout << "set exposure time to: " << f_exp << endl;
 
-    //Check FrameRate
-    double fps_actual;
-    i_retCode = AT_GetFloat(_handle, L"FrameRate", &fps_actual);
-    if (i_retCode != AT_SUCCESS) {
-        cout << "Error getting FrameRate, Error code " << i_retCode << endl << endl;
-    }
-    cout << "FrameRate set to " << fps_actual << endl;
+		i_retCode = AT_SetFloat(_handle, L"ExposureTime", f_exp);
+		if (i_retCode != AT_SUCCESS) {
+			cout << "Error setting Exposure time to " << f_exp << " Error code " << i_retCode << endl << endl;
+		}
+
+		//Check exposure time
+		double d_actual;
+		i_retCode = AT_GetFloat(_handle, L"ExposureTime", &d_actual);
+		if (i_retCode != AT_SUCCESS) {
+			cout << "Error getting Exposure time, Error code " << i_retCode << endl << endl;
+		}
+		cout << "Exposure time set to " << d_actual << " second(s)" << endl;
+
+		//Get FrameRate range
+		double fps_max = 0;
+		double fps_min = 0;
+		AT_GetFloatMax(_handle, L"FrameRate", &fps_max);
+		AT_GetFloatMin(_handle, L"FrameRate", &fps_min);
+		cout << endl << "You can set Frame Rate between " << fps_min << " and " << fps_max << " ." << endl;
+
+		//Set FrameRate
+		double fps = 100;
+		cout << endl << "Enter the Frame Rate in fps, e.g. 100." << endl;
+		cin >> fps;
+
+		i_retCode = AT_SetFloat(_handle, L"FrameRate", fps);
+		if (i_retCode != AT_SUCCESS) {
+			cout << "Error setting FrameRate to " << fps << " Error code " << i_retCode << endl << endl;
+		}
+
+		//Check FrameRate
+		double fps_actual;
+		i_retCode = AT_GetFloat(_handle, L"FrameRate", &fps_actual);
+		if (i_retCode != AT_SUCCESS) {
+			cout << "Error getting FrameRate, Error code " << i_retCode << endl << endl;
+		}
+		cout << "FrameRate set to " << fps_actual << endl;
+	}
+
 
     return i_retCode;
-
-	//check bit depth
-	//int bitdepth;
-	//i_retCode = AT_GetEnumerated(_handle, L"BitDepth",&bitdepth);
-	//if (i_retCode != AT_SUCCESS) {
-	//	cout << "Error getting bit depth, Error code " << i_retCode << endl << endl;
-	//}
-	//cout << "bitdeoth is " << bitdepth << endl;
 
 }
 
 int AutogetUserSettings(int _handle) {
 	//Set hardware trigger
 	int i_retCode;
-	i_retCode = AT_SetEnumString(_handle, L"TriggerMode", L"Internal");
+	i_retCode = AT_SetEnumString(_handle, L"TriggerMode", L"External Exposure");
 	if (i_retCode != AT_SUCCESS)
 	{
 		cout << "Error setting Trigger Mode " << endl;
@@ -739,171 +732,7 @@ int SetupBinningandAOI(int _handle){
 
 }
 
-
-
-void T2Cam_Initialize(CamData* MyCamera, int* _handle) {
-    //自动设置选择
-    bool Auto = false;
-    cout << "Do you want to Set Up Automatically?" << endl << "Please input 0 for NO or 1 for YES." << endl;
-    cin >> Auto;
-    
-    T2Cam_InitializeLib(_handle);
-    SetupBinningandAOI(*_handle);
-    T2Cam_InitializeCamData(MyCamera, *_handle);
-
-    if (Auto) {
-        AutogetUserSettings(*_handle);
-    }
-    else {
-        getUserSettings(*_handle);
-    }
-
-    CreateBuffer(MyCamera, *_handle);
-    
-}
-
 void T2Cam_Close(CamData* MyCamera, AT_H _handle) {
     T2Cam_TurnOff(MyCamera, _handle);
-    T2Cam_CloseLib();
-}
-
-//TODO: 创建GPU Exp Path并将Buffer加入队列
-int InitGpuExpLib(AT_GPU_H* _gpuhandle) {
-    int i_returnCode;
-    i_returnCode = AT_GPU_InitialiseLibrary(); //初始化lib
-    if (i_returnCode == AT_GPU_SUCCESS) {
-        i_returnCode = AT_GPU_CheckGPUCapability(); //检查GPU可用性
-        if (i_returnCode == AT_GPU_SUCCESS) {
-            i_returnCode = AT_GPU_Open(_gpuhandle); //获取句柄
-            if (i_returnCode == AT_GPU_SUCCESS) {
-                printf("Init GPU Express Lib and get handle succeed. \n"); //反馈: 成功打开lib并获取句柄
-            }
-            else {
-                printf("Error in get GPU Express handle. Error code: %d \n", i_returnCode); //反馈: 获取句柄失败
-            }
-        }
-        else {
-            printf("Error in checking GPU Capability. Error code: %d \n", i_returnCode); //反馈: GPU不可用
-        }
-    }
-    else {
-        printf("Error in Initializing GPU Express. Error code: %d \n", i_returnCode); //反馈: lib初始化失败
-    }
-    return i_returnCode;
-}
-
-int CloseGPUExpLib(AT_GPU_H _gpuhandle) {
-    int i_returnCode;
-    i_returnCode = AT_GPU_Close(_gpuhandle); //关闭句柄
-    if (i_returnCode != AT_GPU_SUCCESS) {
-        printf("Error in clearing Andor GPU Express Handle! Error code: %d \n" , i_returnCode); //反馈: 句柄关闭失败
-    }
-    else {
-        i_returnCode = AT_GPU_FinaliseLibrary(); //关闭lib
-        if (i_returnCode != AT_SUCCESS) {
-            printf("Error in closing Andor GPU Express Library! Error code: %d \n", i_returnCode); //反馈: lib关闭失败
-        }
-        else {
-            printf("Andor GPU Express Library closed! \n"); //反馈: 句柄与lib关闭成功
-        }
-    }
-    return i_returnCode;
-}
-
-int CreateGPUExpBuffer(CamData* MyCamera, AT_GPU_H _gpuhandle) {
-    AT_GPU_ConfigureSet(_gpuhandle, NumberOfPaths); //申请NumberOfPaths个Path
-    AT_GPU_U64 ImageSizeBytes = MyCamera->ImageHeight * MyCamera->ImageWidth * 2; //转码后图像大小(字节数)
-    AT_GPU_U64 InputBufferSize[BuffersPerPath]; //InputBufferArray中每个Buffer的大小数组
-    for (int i = 0; i < BuffersPerPath; i++) {
-		InputBufferSize[i] = ImageSizeBytes;
-    }
-    AT_GPU_ConfigureInputBuffers(_gpuhandle, BuffersPerPath, InputBufferSize); //配置InputBuffer
-    AT_GPU_ConfigureOutputCpuBuffers(_gpuhandle, BuffersPerPath, InputBufferSize); //配置CpuOutputBuffer
-    return 0;
-}
-
-int T2Cam_GPU_Initialize(CamData* MyCamera, int* _handle, AT_GPU_H* _gpuhandle) {
-    
-    T2Cam_Initialize(MyCamera, _handle);
-    
-    InitGpuExpLib(_gpuhandle); //NEW: 初始化GPU Exp
-
-    CreateGPUExpBuffer(MyCamera, *_gpuhandle); //NEW: 初始化GPU Path Buffer
-    
-    return 0;
-}
-
-int T2Cam_GPU_GrabFrame(CamData* MyCamera, AT_H _handle, AT_GPU_H _gpuhandle) {
-
-    //AT_U8* pBuf;
-    unsigned char* pBuf;
-    int BufSize = static_cast<int>(MyCamera->ImageSizeBytes);
-    //int BufSize = static_cast<int>(MyCamera->ImageSizeBytes);
-
-
-    //issue software trigger command
-
-    //iret = AT_Command(_handle, L"SoftwareTrigger");
-    //if (iret!=AT_SUCCESS){
-    //  cout << "Error:Return from Software trigger command not success " << iret << endl;
-    //  return 1;
-    //}
-    //now do a wait and if its not success then error
-
-    int iret;
-    int iError;
-    //int data[2];
-
-      /*unsigned char** ppBuf=&pBuf;
-      int* pBufSize = &BufSize;*/
-    iret = AT_WaitBuffer(_handle, &pBuf, &BufSize, 10000);
-    if (iret != AT_SUCCESS) {
-        cout << "Error:Acquisition timeout when not expecting, retcode " << iret << endl;
-        return -1;
-    }
-
-    //NEW: Gpu版本的获取图像函数在这里将承载转码后图像的位置从MyCamera->ImageRawData变为对应的CpuInputBuffer (变动起始位置)
-    void** cpuBufferArray;
-    int iPathNumber = MyCamera->iFrameNumber / BuffersPerPath;
-    int iBufferNumber = MyCamera->iFrameNumber % BuffersPerPath;
-	// 下面这两个函数所传入的buffer必须一样
-    AT_GPU_GetInputCpuBufferArray(_gpuhandle, iPathNumber % NumberOfPaths, &cpuBufferArray);
-    iError = AT_ConvertBuffer(pBuf, reinterpret_cast<unsigned char*>(cpuBufferArray[iBufferNumber]),
-        MyCamera->ImageWidth, MyCamera->ImageHeight, MyCamera->ImageStride, CCDENCODING, L"Mono16");
-    //转码在这一步完成, 意味着不管你是用的什么方式获取的原始数据, 最后拿到的"原始数据"ImageRawData总是Mono16格式的
-    //转码的另一个重要意义在于除去原始图像中的padding区域, 所以即便原始图像使用Mono16格式获取, 也应进行转码
-    if (iError != AT_SUCCESS) {
-        cout << "Convert image format failed- return code " << iError << endl; 
-        return -1;
-    }
-    //NEW: Gpu版本的获取图像函数在这里将承载转码后图像的位置从MyCamera->ImageRawData变为对应的CpuInputBuffer (变动结束位置)
-    //cout << "    First 2 pixels " << MyCamera->ImageRawData[0] << " " << MyCamera->ImageRawData[1]<< endl;
-
-
-
-    //printf("grabbed a frame! \n");
-
-    //extract2from3(pBuf,data);
-
-    //cout << "    First 2 pixels " << data[1] << " " << data[0] << endl;
-
-    //iError = AT_QueueBuffer(_handle, MyCamera->AlignedBuffers[MyCamera->FrameNumber%NumberOfBuffers], static_cast<int>(MyCamera->ImageSizeBytes));
-    iError = AT_QueueBuffer(_handle, pBuf, BufSize);
-
-
-    if (iError != AT_SUCCESS) {
-        cout << "AT_QueueBuffer failed - Image Size Bytes - return code " << iError << endl;
-    }
-    MyCamera->iFrameNumber++;
-    //cout << "Got image " << MyCamera->FrameNumber  << endl;
-
-
-
-    return 0;
-}
-
-void T2Cam_GPU_Close(CamData* MyCamera, AT_H _handle, AT_GPU_H _gpuhandle) {
-    T2Cam_TurnOff(MyCamera, _handle);
-    CloseGPUExpLib(_gpuhandle); //NEW: 关闭GPU Exp
     T2Cam_CloseLib();
 }

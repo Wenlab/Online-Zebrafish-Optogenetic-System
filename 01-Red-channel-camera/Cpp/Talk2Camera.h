@@ -103,39 +103,17 @@ int CreateBuffer(CamData* MyCamera,int _handle);
 
 void T2Cam_StartAcquisition(int _handle);
 
-
-
-unsigned char* QueueBuffer(int _handle);
-
 int getUserSettings(int _handle);
 
 int SetupBinningandAOI(int _handle);
 
 void deleteBuffers(CamData* MyCamera);
 
-void extract2from3(unsigned char* _buffer, int *_i_returns);
-
-
-//Automatically Initialize and Set Up the Camera
-
-//int T2Cam_AutoInitializeLib(int* Hndl);
 
 int AutogetUserSettings(int _handle);
 
-void T2Cam_Initialize(CamData* MyCamera, int* _handle);
 
 void T2Cam_Close(CamData* MyCamera, AT_H _handle);
 
-int InitGpuExpLib(AT_GPU_H* _gpuhandle);
-
-int CloseGPUExpLib(AT_GPU_H _gpuhandle);
-
-int CreateGPUExpBuffer(CamData* MyCamera, AT_GPU_H _gpuhandle);
-
-int T2Cam_GPU_Initialize(CamData* MyCamera, int* _handle, AT_GPU_H* _gpuhandle);
-
-int T2Cam_GPU_GrabFrame(CamData* MyCamera, AT_H _handle, AT_GPU_H _gpuhandle);
-
-void T2Cam_GPU_Close(CamData* MyCamera, AT_H _handle, AT_GPU_H _gpuhandle);
 
 #endif /* TALK2CAMERA_H_ */
