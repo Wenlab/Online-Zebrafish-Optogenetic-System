@@ -32,6 +32,7 @@ void Experiment::initialize()
 
 	Image = new unsigned short int[2048 * 2048 * 1];  //开辟缓存区
 	Image4bin = new unsigned short int[512 * 512 * 1];
+	mip_cpu = new float[200 * 200 * 1];
 
 	//初始化相机
 	cam_data = T2Cam_CreateCamData(); //动态申请CamData结构体的空间,创建指向该空间的cam_data指针
@@ -42,6 +43,18 @@ void Experiment::initialize()
 	CreateBuffer(cam_data, cam_handle);
 	cout << "camera prepare done" << endl;
 
+	//初始化galvo
+	galvoXmin = -10;
+	galvoYmin = -10;
+	galvo.initialize();
+	generateMatFromYaml(galvoMatrixX, "GalvoX_matrix");
+	generateMatFromYaml(galvoMatrixY, "GalvoY_matrix");
+	//resize(galvoMatrixX, galvoMatrixX, cv::Size(), scale, scale);
+	//resize(galvoMatrixY, galvoMatrixY, cv::Size(), scale, scale);
+	//	galvoMatrixX = Mat(galvoMatrixX, Rect(180, 180, 360, 360));
+	//	galvoMatrixY = Mat(galvoMatrixY, Rect(180, 180, 360, 360));
+	minMaxLoc(galvoMatrixX, &galvoXmin);
+	minMaxLoc(galvoMatrixY, &galvoYmin);
 
 	fishImgProc.initialize();
 	cout << "initialize fishImgProc done" << endl;
@@ -103,7 +116,7 @@ void Experiment::readFullSizeImgFromFile()
 					//cout << Image[(bandind - 1) * nImgSizeX * nImgSizeY + i * nImgSizeY + j] << endl;
 				}
 			}
-
+			free(pafScanline);
 		}
 
 		resizeImg();
@@ -112,8 +125,9 @@ void Experiment::readFullSizeImgFromFile()
 
 		if (frameNum >= beforeResizeImgNames.size()-1)
 		{
-			UserWantToStop = 1;
-			break;
+			frameNum = 0;
+			//UserWantToStop = 1;
+			//break;
 		}
 	}
 
@@ -139,10 +153,22 @@ void Experiment::readFullSizeImgFromCamera()
 			cout << "Error in imaging acquisition!" << endl;
 			break;
 		}
+
+		flipImage();
+		resizeImg();
+		frameNum = frameNum + 1;
 	}
 
 	AT_Command(cam_handle, L"AcquisitionStop");
 	cout << endl << endl;
+
+	return;
+}
+
+void Experiment::flipImage()
+{
+	cv::Mat temp(cv::Size(CCDSIZEX, CCDSIZEY), CV_16UC1, Image);
+	cv::flip(temp, temp, 0);   //flipcode=0,垂直翻转图像
 
 	return;
 }
@@ -207,9 +233,8 @@ void Experiment::saveImg2Disk(string filename)
 
 void Experiment::getReconMIP()
 {
-	float* temp = new float[200 * 200 * 1];
-	cudaMemcpy(temp, fishImgProc.image2D_XY_gpu, sizeof(float) * 200 * 200 * 1, cudaMemcpyDeviceToHost);
-	MIP = cv::Mat(200, 200, CV_32FC1, temp);
+	cudaMemcpy(mip_cpu, fishImgProc.image2D_XY_gpu, sizeof(float) * 200 * 200 * 1, cudaMemcpyDeviceToHost);
+	MIP = cv::Mat(200, 200, CV_32FC1, mip_cpu);
 
 	cv::normalize(MIP, MIP, 0, 1, cv::NormTypes::NORM_MINMAX);
 
@@ -352,11 +377,14 @@ void Experiment::writeOutData()
 	int frameCount_writeOut = 0;
 	while (!UserWantToStop)
 	{
-		if (frameCount_writeOut != frameNum)
+		if (recordOn)
 		{
-			saveImg2Disk(folderName + "/" + int2string(6, frameNum) + ".tif");
-			writeOutTxt();
-			frameCount_writeOut = frameNum;
+			if (frameCount_writeOut != frameNum)
+			{
+				saveImg2Disk(folderName + "/" + int2string(6, frameNum) + ".tif");
+				writeOutTxt();
+				frameCount_writeOut = frameNum;
+			}
 		}
 	}
 
@@ -366,6 +394,7 @@ void Experiment::writeOutData()
 
 void Experiment::imgProcess()
 {
+	//Timer time;
 	cout << "Image recon and regis thread Say Hello!! :)" << endl;
 
 	int frameCount_imgprocess = 0;
@@ -373,15 +402,21 @@ void Experiment::imgProcess()
 	{
 		if (frameCount_imgprocess != frameNum)
 		{
+			//time.start();
 			ImgReconAndRegis();
 			getReconMIP();
 			frameCount_imgprocess = frameNum;
+			generateGalvoVotages();
+			//time.stop();
+			//cout << "process time: " << time.getElapsedTimeInMilliSec() << endl;
 		}
 
 	}
 	cout << "Image recon and regis thread say goodbye!!" << endl;
 	return;
 }
+
+
 
 void Experiment::controlExp()
 {
@@ -418,17 +453,49 @@ void Experiment::controlExp()
 	return;
 }
 
-
+void Experiment::generateGalvoVotages()
+{
+	bool inverse = false;
+	cv::Point p(0, 0);
+	//continue read pixel coordinates
+	galvoVotagesPairs.clear();
+	for (int i = 0; i < ROIpoints.size(); i++)
+	{
+		cv::Point p = cv::Point(ROIpoints[i].x, ROIpoints[i].y);
+		float* Xdata = galvoMatrixY.ptr<float>(p.x);
+		float galvo_x = Xdata[i];
+		float* Ydata = galvoMatrixX.ptr<float>(p.y);
+		float galvo_y = Ydata[i];
+		galvoVotagesPairs.push_back(cv::Point2f(galvo_x, galvo_y));
+	}
+}
 
 void Experiment::galvoControl()
 {
 	cout << "I'm galvo thread." << endl;
 	while (!UserWantToStop)
 	{
-		if (params.laserOn)
+		bool read_inverse = false;
+		while (params.laserOn)
 		{
-			
+			if (read_inverse)
+			{
+				for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)
+				{
+					galvo.spinGalvo(galvoVotagesPairs[a]);
+				}
+				read_inverse = false;
+			}
+			else
+			{
+				for (long a = 0; a < galvoVotagesPairs.size(); a++)
+				{
+					galvo.spinGalvo(galvoVotagesPairs[a]);
+				}
+				read_inverse = true;
+			}
 		}
+		galvo.spinGalvo(cv::Point(-5, -5));   //放在一个很偏的点
 	}
 
 	cout << "galvo thread say goodbye!!" << endl;
@@ -443,6 +510,7 @@ void Experiment::clear()
 
 	free(Image);
 	free(Image4bin);
+	free(mip_cpu);
 
 	cv::destroyAllWindows();
 
@@ -450,6 +518,9 @@ void Experiment::clear()
 	//Camera and Libs
 	T2Cam_TurnOff(cam_data, cam_handle);
 	T2Cam_CloseLib();
+
+	cv::Point pt(0, 0);
+	galvo.spinGalvo(pt);
 
 	cout << "clear exp" << endl;
 	return;
@@ -461,3 +532,5 @@ void Experiment::exit()
 	exit();
 	return;
 }
+
+

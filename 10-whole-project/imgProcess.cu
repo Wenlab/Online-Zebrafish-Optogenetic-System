@@ -1,9 +1,7 @@
 #include"imgProcess.h"
 #include"kexinLibs.h"
-//#include"kexinLibs.cpp"
 #include"initANDcheck.h"
-//#include"initANDcheck.cu"
-//#include"header.cuh"
+
 #include "reconstructionCUDA.cuh"
 #include "templateMatchingCUDA.cuh"
 
@@ -62,6 +60,9 @@ int ObjRecon_size = 200 * 200 * 50;
 
 void FishImageProcess::initialize()
 {
+
+
+
 	//读取PSF和未重构的文件
 	string PSF_1_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/old/PSF_1_zhuanzhi_float.dat";//matlab中保存出来的float类型
 	string X31_file = "D:/kexin/Online-Zebrafish-Optogenetic/data/old/r20210924_2_X31_resize.tif";
@@ -606,11 +607,11 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 	NppiSize Input_Size;//输入图像的行列数
 	Input_Size.width = 200;
 	Input_Size.height = 200;
+
 	/* 分配显存，将原图传入显存 */
 	int nSrcPitchCUDA = Input_Size.width * sizeof(float);//每行所占的字节数
-	float *input_image_gpu;
-	check1(cudaMalloc((void**)&input_image_gpu, sizeof(float)*Input_Size.width*Input_Size.height), "input_image_gpu cudaMalloc Error", __FILE__, __LINE__);
-
+	float *input_image_gpu;  //旋转前
+	check1(cudaMalloc((void**)&input_image_gpu, sizeof(float) * 200 * 200), "input_image_gpu cudaMalloc Error", __FILE__, __LINE__);
 
 	/* 计算旋转后长宽 */
 	NppiRect Input_ROI;//特定区域的旋转，相当于裁剪图像的一块，本次采用全部图像
@@ -631,8 +632,8 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 
 
 	/* 转换后的图像显存分配 */
+	float *output_image_gpu;  //旋转后
 	int nDstPitchCUDA = Output_Size.width * sizeof(float);
-	float *output_image_gpu;
 	check1(cudaMalloc((void**)&output_image_gpu, sizeof(float)*Output_Size.width*Output_Size.height), "output_image_gpu cudaMalloc Error", __FILE__, __LINE__);
 
 
@@ -651,85 +652,14 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 		assert(nppRet == NPP_NO_ERROR);
 		check(cudaMemcpy(imageRotated3D_gpu + Input_Size.width*Input_Size.height * i, output_image_gpu, sizeof(float) * Output_Size.width*Output_Size.height, cudaMemcpyDeviceToDevice), "output_image cudaMemcpy Error");
 	}
+
+	//free(input_image_gpu);
+	//free(output_image_gpu);
+
+	return;
 }
 
 
-//void FishImageProcess::matchingANDrotationYZ()
-//{
-//	/*  YZ平面的模板匹配和旋转  */
-////求 y-z面的投影,计算imageRotated3D一个像素在行方向的最大值
-//	float *image2D_YZ_gpu;
-//	check1(cudaMalloc((void**)&image2D_YZ_gpu, sizeof(float) * 200 * 50), "image2D_YZ_gpu cudaMalloc Error", __FILE__, __LINE__);//200行*50列按照imageRotated3D的列优先排列，是matlab中按照列优先排列
-//	dim3 block_4(32, 32, 1);
-//	dim3 grid_4((50 + block_4.x - 1) / block_4.x, (200 + block_4.y - 1) / block_4.y, 1);
-//	kernel_4 << <grid_4, block_4 >> > (imageRotated3D_gpu, image2D_YZ_gpu);
-//	cudaDeviceSynchronize();
-//	checkGPUStatus(cudaGetLastError(), "kernel_4 Error");
-//	//image2D_YZ_gpu求和、均值
-//	thrust::device_ptr<float> dev_ptr1(image2D_YZ_gpu);
-//	double image2D_YZ_mean = thrust::reduce(dev_ptr1, dev_ptr1 + size_t(200 * 50), (float)0, thrust::plus<float>()) / (200 * 50) + 14;
-//	//二值化 y-z面，大于mean的取1， 小于等于mean的取0
-//	float *img2DBW_YZ_gpu;
-//	check1(cudaMalloc((void**)&img2DBW_YZ_gpu, sizeof(float) * 200 * 50), "img2DBW_YZ_gpu cudaMalloc Error", __FILE__, __LINE__);
-//	int threadNum_5 = 256;
-//	int blockNum_5 = (200 * 50 - 1) / threadNum_5 + 1;
-//	kernel_5 << <blockNum_5, threadNum_5 >> > (image2D_YZ_gpu, image2D_YZ_mean, img2DBW_YZ_gpu);
-//	cudaDeviceSynchronize();
-//	checkGPUStatus(cudaGetLastError(), "kernel_5 Error");
-//
-//
-//	//对每个角度的误差 初始化
-//	float *template_roYZ_gpu;
-//	check1(cudaMalloc((void**)&template_roYZ_gpu, sizeof(float) * template_roYZ_size), "template_roYZ_gpu cudaMalloc Error", __FILE__, __LINE__);
-//	check(cudaMemcpy(template_roYZ_gpu, template_roYZ, sizeof(float)*template_roYZ_size, cudaMemcpyHostToDevice), "template_roYZ_gpu cudaMemcpy Error");
-//	double *err_YZ_gpu;
-//	check1(cudaMalloc((void**)&err_YZ_gpu, sizeof(double) * rotationAngleYZ_size), "err_YZ_gpu cudaMalloc Error", __FILE__, __LINE__);
-//	int threadNum_6 = 256;
-//	int blockNum_6 = (rotationAngleYZ_size - 1) / threadNum_6 + 1;
-//	kernel_6 << <blockNum_5, threadNum_5 >> > (template_roYZ_gpu, img2DBW_YZ_gpu, rotationAngleYZ_size, err_YZ_gpu);
-//	cudaDeviceSynchronize();
-//	checkGPUStatus(cudaGetLastError(), "kernel_6 Error");
-//	//求err_YZ_gpu的最小值和最小值的索引
-//	double *err_YZ = new double[rotationAngleYZ_size];
-//	check(cudaMemcpy(err_YZ, err_YZ_gpu, sizeof(double)*rotationAngleYZ_size, cudaMemcpyDeviceToHost), "err_YZ cudaMemcpy Error");
-//	double err_YZ_min = DBL_MAX;
-//	for (int i = 0; i < rotationAngleYZ_size; i++)
-//	{
-//		if (err_YZ[i] < err_YZ_min)
-//			err_YZ_min = err_YZ[i];
-//	}
-//	int idx2;
-//	for (int i = 0; i < rotationAngleYZ_size; i++)
-//	{
-//		if (err_YZ[i] == err_YZ_min)
-//		{
-//			idx2 = i;
-//			break;
-//		}
-//	}
-//	//imageRotated3D旋转，绕X轴逆旋转rotationAngleYZ(idx2)度
-//	//先把imageRotated3D_gpu的维度变换一下，列变成波段，波段变成列，行变成反着，(200 * 200 * 50)变成(200行 * 50列 * 200)波段
-//	float *imageRotated3D_gpu_1;
-//	check1(cudaMalloc((void**)&imageRotated3D_gpu_1, sizeof(float)*ObjRecon_size), "imageRotated3D_gpu_1 cudaMalloc Error", __FILE__, __LINE__);
-//	dim3 block_7(8, 8, 8);
-//	dim3 grid_7((200 + block_7.x - 1) / block_7.x, (200 + block_7.y - 1) / block_7.y, (50 + block_7.z - 1) / block_7.z);
-//	kernel_7 << <grid_7, block_7 >> > (imageRotated3D_gpu, imageRotated3D_gpu_1);
-//	cudaDeviceSynchronize();
-//	checkGPUStatus(cudaGetLastError(), "kernel_7 Error");
-//	//第二次旋转
-//	float *imageRotated3D_gpu_2;
-//	check1(cudaMalloc((void**)&imageRotated3D_gpu_2, sizeof(float)*ObjRecon_size), "imageRotated3D_gpu_2 cudaMalloc Error", __FILE__, __LINE__);
-//	ObjRecon_imrotate3_X_gpu(imageRotated3D_gpu_1, rotationAngleYZ[idx2], imageRotated3D_gpu_2);
-//	//再把维度变换成原来的
-//	dim3 block_8(8, 8, 8);
-//	dim3 grid_8((200 + block_7.x - 1) / block_7.x, (200 + block_7.y - 1) / block_7.y, (50 + block_7.z - 1) / block_7.z);
-//	kernel_8 << <grid_8, block_8 >> > (imageRotated3D_gpu_2, imageRotated3D_gpu);
-//	cudaDeviceSynchronize();
-//	checkGPUStatus(cudaGetLastError(), "kernel_8 Error");
-//
-//
-//	return;
-//}
 
 
 void FishImageProcess::cropRotatedImage()

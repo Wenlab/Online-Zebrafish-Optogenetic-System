@@ -1,6 +1,7 @@
 #pragma once
 #include"imgProcess.h"
 #include"Talk2Camera.h"
+#include"Talk2Galvo.h"
 
 #include<opencv2/opencv.hpp>
 #include<opencv2/highgui/highgui.hpp>
@@ -26,6 +27,7 @@ public:
 
 	unsigned short int *Image;
 	unsigned short int *Image4bin;
+	float* mip_cpu;
 
 	//cameras
 	AT_H cam_handle; //相机句柄变量的声明,随后将再初始化时为其赋值,之后用它来传递相机信息
@@ -56,6 +58,15 @@ public:
 	std::string txtName;
 	std::ofstream outTXT;
 
+	//galvo control
+	double galvoXmin;
+	double galvoYmin;
+	GalvoData galvo;
+	cv::Mat galvoMatrixX;
+	cv::Mat galvoMatrixY;
+	double scale;
+	std::vector<cv::Point2f> galvoVotagesPairs;
+
 	void initialize();
 	void resizeImg();
 	void ImgReconAndRegis();
@@ -72,6 +83,8 @@ public:
 	
 	void controlExp();
 
+	void generateGalvoVotages();
+
 
 	void clear();
 	void exit();
@@ -82,6 +95,8 @@ public:
 	void galvoControl();
 	void readFullSizeImgFromFile();
 	void readFullSizeImgFromCamera();
+
+	void flipImage();
 
 private:
 

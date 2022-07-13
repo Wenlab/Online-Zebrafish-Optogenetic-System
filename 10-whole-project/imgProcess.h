@@ -61,6 +61,8 @@ public:
 	float *gpuObjRecon_crop;   //GPU上存储crop后的ObjRecon, 重构结果
 
 	//旋转
+
+
 	float *image2D_XY_gpu;
 	float *img2DBW_XY_gpu;
 	float *template_roXY_gpu;

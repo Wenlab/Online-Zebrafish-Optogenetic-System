@@ -174,7 +174,7 @@ void saveAndCheckImage(float* imageData, int col_total, int row_total, int z_tot
 	}
 	//fout.close();
 	delete ds;
-	
+	free(ObjRecon_buffer);
 
 
 	return;
@@ -250,4 +250,18 @@ std::string getTime()
 	cout << buf << endl;
 	std::string time = buf;
 	return time;
+}
+
+void generateMatFromYaml(cv::Mat& matrix, std::string dataName)
+{
+	string fileName = dataName + ".yaml";
+	cv::FileStorage file(fileName, cv::FileStorage::READ);
+	file[dataName] >> matrix;
+
+	cout << "reading " << dataName << " from " << fileName;
+	cout << "Mat:" << endl;
+	cout << dataName << ".size(): " << matrix.size() << endl;
+	cout << dataName << ".depth: " << matrix.depth() << endl;
+	cout << dataName << ".channels: " << matrix.channels() << endl;
+	file.release();
 }
