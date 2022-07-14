@@ -368,8 +368,9 @@ void FishImageProcess::reconImage()
 {
 	////*----1、使用cufftPlan2d的方法进行二维fft----------*/
 	cufftHandle plan;
-	cufftResult res = cufftPlan2d(&plan, PSF_size_1, PSF_size_2, CUFFT_C2C);
-
+	//cufftResult res;
+	cufftResult res= cufftPlan2d(&plan, PSF_size_1, PSF_size_2, CUFFT_C2C);  
+	
 
 
 	check(cudaMemcpy(Img_gpu, Img, PSF_size_1*PSF_size_2 * sizeof(unsigned short), cudaMemcpyHostToDevice), "Img_gpu cudaMemcpy Error");
@@ -377,6 +378,7 @@ void FishImageProcess::reconImage()
 	ImgExp_ge << <blockNum_12, threadNum_12 >> > (Img_gpu, BkgMean, ImgExp, PSF_size_1*PSF_size_2);
 	cudaDeviceSynchronize();
 	checkGPUStatus(cudaGetLastError(), "ImgExp_ge Error");
+
 
 	//Ratio和gpuObjRecon的元素都赋值1
 	Ratio_fuzhi << <blockNum_12, threadNum_12 >> > (Ratio, PSF_size_1*PSF_size_2);
@@ -476,6 +478,7 @@ void FishImageProcess::reconImage()
 
 	}
 
+	cufftDestroy(plan);   //添加这一句，cufftPlan2d不再产生显存泄露
 
 	if (DEBUG)
 	{
