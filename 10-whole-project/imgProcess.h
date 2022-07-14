@@ -62,7 +62,8 @@ public:
 
 	//旋转
 
-
+	float *input_image_gpu;  //旋转前
+	float *output_image_gpu;  //旋转后
 	float *image2D_XY_gpu;
 	float *img2DBW_XY_gpu;
 	float *template_roXY_gpu;

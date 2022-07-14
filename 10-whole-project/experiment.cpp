@@ -34,7 +34,7 @@ void Experiment::initialize()
 	Image4bin = new unsigned short int[512 * 512 * 1];
 	mip_cpu = new float[200 * 200 * 1];
 
-	//初始化相机
+	////初始化相机
 	cam_data = T2Cam_CreateCamData(); //动态申请CamData结构体的空间,创建指向该空间的cam_data指针
 	T2Cam_InitializeLib(&cam_handle);
 	SetupBinningandAOI(cam_handle);
@@ -43,7 +43,7 @@ void Experiment::initialize()
 	CreateBuffer(cam_data, cam_handle);
 	cout << "camera prepare done" << endl;
 
-	//初始化galvo
+	////初始化galvo
 	galvoXmin = -10;
 	galvoYmin = -10;
 	galvo.initialize();
@@ -405,8 +405,8 @@ void Experiment::imgProcess()
 			//time.start();
 			ImgReconAndRegis();
 			getReconMIP();
-			frameCount_imgprocess = frameNum;
-			generateGalvoVotages();
+			//frameCount_imgprocess = frameNum;
+			//generateGalvoVotages();
 			//time.stop();
 			//cout << "process time: " << time.getElapsedTimeInMilliSec() << endl;
 		}

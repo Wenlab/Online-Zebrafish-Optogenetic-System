@@ -119,59 +119,6 @@ __global__ void kernel_7(float *imageRotated3D_gpu, float *imageRotated3D_gpu_1)
 		imageRotated3D_gpu_1[i * 200 * 50 + j * 50 + k] = imageRotated3D_gpu[(49 - k) * 200 * 200 + (199 - j) * 200 + i];
 	}
 }
-//按照X轴旋转
-//void ObjRecon_imrotate3_X_gpu(float *imageRotated3D_gpu_1, double nAngle, float *imageRotated3D_gpu_2)
-//{
-//	NppiSize Input_Size;//输入图像的行列数
-//	Input_Size.width = 200;
-//	Input_Size.height = 50;
-//	/* 分配显存，将原图传入显存 */
-//	int nSrcPitchCUDA = Input_Size.width * sizeof(float);//每行所占的字节数
-//	float *input_image_gpu;
-//	check1(cudaMalloc((void**)&input_image_gpu, sizeof(float)*Input_Size.width*Input_Size.height), "input_image_gpu cudaMalloc Error", __FILE__, __LINE__);
-//
-//
-//	/* 计算旋转后长宽 */
-//	NppiRect Input_ROI;//特定区域的旋转，相当于裁剪图像的一块，本次采用全部图像
-//	Input_ROI.x = Input_ROI.y = 0;
-//	Input_ROI.width = Input_Size.width;
-//	Input_ROI.height = Input_Size.height;
-//	double aBoundingBox[2][2];
-//	nppiGetRotateBound(Input_ROI, aBoundingBox, nAngle, 0, 0);
-//	int bb = ((int)ceil(fabs(aBoundingBox[1][0] - aBoundingBox[0][0])) - Input_ROI.width) / 2 + aBoundingBox[0][0];//起始列
-//	int cc = ((int)ceil(fabs(aBoundingBox[1][1] - aBoundingBox[0][1])) - Input_ROI.height) / 2 + aBoundingBox[0][1];//起始行
-//	aBoundingBox[0][0] = bb;//起始列
-//	aBoundingBox[0][1] = cc;//起始行
-//	NppiSize Output_Size;
-//	Output_Size.width = (int)ceil(fabs(aBoundingBox[1][0] - aBoundingBox[0][0]));
-//	Output_Size.height = (int)ceil(fabs(aBoundingBox[1][1] - aBoundingBox[0][1]));
-//	Output_Size.width = Input_Size.width;
-//	Output_Size.height = Input_Size.height;
-//
-//
-//	/* 转换后的图像显存分配 */
-//	int nDstPitchCUDA = Output_Size.width * sizeof(float);
-//	float *output_image_gpu;
-//	check1(cudaMalloc((void**)&output_image_gpu, sizeof(float)*Output_Size.width*Output_Size.height), "output_image_gpu cudaMalloc Error", __FILE__, __LINE__);
-//
-//
-//	//输出感兴趣区的大小，相当于把输出图像再裁剪一遍，应该是这样，还没测试，这个有用
-//	NppiRect Output_ROI;
-//	Output_ROI.x = 0; Output_ROI.y = 0;
-//	Output_ROI.width = Input_Size.width;
-//	Output_ROI.height = Input_Size.height;
-//
-//	for (int i = 0; i < 200; i++)
-//	{
-//		check(cudaMemcpy(input_image_gpu, imageRotated3D_gpu_1 + Input_Size.width*Input_Size.height * i, sizeof(float)*Input_Size.width*Input_Size.height, cudaMemcpyDeviceToDevice), "input_image_gpu cudaMemcpy Error");
-//		/* 处理旋转 */
-//		NppStatus nppRet = nppiRotate_32f_C1R(input_image_gpu, Input_Size, nSrcPitchCUDA, Input_ROI,
-//			output_image_gpu, nDstPitchCUDA, Output_ROI, nAngle, -aBoundingBox[0][0], -aBoundingBox[0][1], NPPI_INTER_NN);
-//		assert(nppRet == NPP_NO_ERROR);
-//		check(cudaMemcpy(imageRotated3D_gpu_2 + Input_Size.width*Input_Size.height * i, output_image_gpu, sizeof(float) * Output_Size.width*Output_Size.height, cudaMemcpyDeviceToDevice), "output_image cudaMemcpy Error");
-//	}
-//}
-//再变换到原来的维度
 __global__ void kernel_8(float *imageRotated3D_gpu_2, float *imageRotated3D_gpu)
 {
 	const int i = blockDim.x * blockIdx.x + threadIdx.x;//输出波段循环，输入的列循环

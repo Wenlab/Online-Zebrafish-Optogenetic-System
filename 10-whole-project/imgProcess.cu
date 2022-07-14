@@ -316,6 +316,11 @@ void FishImageProcess::prepareGPUMemory()
 	check(cudaMemcpy(template_roXY_gpu, template_roXY, sizeof(float)*template_roXY_size, cudaMemcpyHostToDevice), "template_roXY_gpu cudaMemcpy Error");
 	check1(cudaMalloc((void**)&err_XY_gpu, sizeof(double) * rotationAngleXY_size), "err_XY_gpu cudaMalloc Error", __FILE__, __LINE__);
 	check1(cudaMalloc((void**)&imageRotated3D_gpu, sizeof(float) * ObjRecon_size), "imageRotated3D_gpu cudaMalloc Error", __FILE__, __LINE__);
+	NppiSize Input_Size;//输入图像的行列数
+	Input_Size.width = 200;
+	Input_Size.height = 200;
+	check1(cudaMalloc((void**)&input_image_gpu, sizeof(float) * 200 * 200), "input_image_gpu cudaMalloc Error", __FILE__, __LINE__);
+	check1(cudaMalloc((void**)&output_image_gpu, sizeof(float)* 200 * 200), "output_image_gpu cudaMalloc Error", __FILE__, __LINE__);
 
 
 	//crop
@@ -424,19 +429,11 @@ void FishImageProcess::reconImage()
 		////7、Tmp=mean(   ImgEst(:)   );
 		thrust::device_ptr<float> dev_ptr(ImgEst);
 		float Tmp = thrust::reduce(dev_ptr, dev_ptr + size_t(PSF_size_1*PSF_size_2), (float)0, thrust::plus<float>()) / (PSF_size_1*PSF_size_2);
-		/**********************************************************************************************************/
-		/*----以上正确，Tmp有误差，matlab中是47424472，C语言是47424477.675621979，差别非常非常小，应该可以忽略
-		第二遍matlab是51785136，C语言是51785130.147748277，差距也非常小，可以忽略----*/
-		/**********************************************************************************************************/
 
 		////8、Ratio(1:end,1:end)=ImgExp(1:end,1:end)./(ImgEst(1:end,1:end)+Tmp/SNR)，并转成复数矩阵，虚部为零;
 		Ratio_Complex_ge << <blockNum_12, threadNum_12 >> > (ImgExp, ImgEst, Tmp, SNR, Ratio_Complex, PSF_size_1*PSF_size_2);
 		cudaDeviceSynchronize();
 		checkGPUStatus(cudaGetLastError(), "Ratio_Complex_ge Error");
-
-		/*******************************************************************************************/
-		/*----以上正确，数组的和，matlab是0.3017935，C语言是0.301793，第二遍正确-------------------*/
-		/*******************************************************************************************/
 
 		////9、fft2(Ratio)
 		res = cufftExecC2C(plan, Ratio_Complex, Ratio_Complex, CUFFT_FORWARD);
@@ -446,10 +443,6 @@ void FishImageProcess::reconImage()
 			system("pause");
 			return;
 		}
-
-		/*******************************************************************************************/
-		/*----以上正确，数组的和和matlab不一样，可能是小数点后面位数太多了，绝对值的和是一样的-------*/
-		/*******************************************************************************************/
 
 		////10、repmat，赋值Nz遍，Ratio_Complex变成三维的fftRatio
 		fftRatio_ge << <grid, block >> > (Ratio_Complex, fftRatio, PSF_size_1, PSF_size_2, PSF_size_3);
@@ -481,12 +474,6 @@ void FishImageProcess::reconImage()
 		cudaDeviceSynchronize();
 		checkGPUStatus(cudaGetLastError(), "gpuObjRecon real_multiply Error");
 
-
-		//float* test = new float[512 * 512 * 50];
-		//check(cudaMemcpy(test, gpuObjRecon, sizeof(float) * 512 * 512 * 50, cudaMemcpyDeviceToHost), "gpuObjRecon_crop cudaMemcpy Error");
-		//saveAndCheckImage(test, 512, 512, 50, int2string(2, i) + "gpuObjRecon.tif");
-
-		//cout << "完成第" << i << "次循环" << endl << endl << endl;
 	}
 
 
@@ -610,8 +597,6 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 
 	/* 分配显存，将原图传入显存 */
 	int nSrcPitchCUDA = Input_Size.width * sizeof(float);//每行所占的字节数
-	float *input_image_gpu;  //旋转前
-	check1(cudaMalloc((void**)&input_image_gpu, sizeof(float) * 200 * 200), "input_image_gpu cudaMalloc Error", __FILE__, __LINE__);
 
 	/* 计算旋转后长宽 */
 	NppiRect Input_ROI;//特定区域的旋转，相当于裁剪图像的一块，本次采用全部图像
@@ -625,16 +610,12 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 	aBoundingBox[0][0] = bb;//起始列
 	aBoundingBox[0][1] = cc;//起始行
 	NppiSize Output_Size;
-	Output_Size.width = (int)ceil(fabs(aBoundingBox[1][0] - aBoundingBox[0][0]));
-	Output_Size.height = (int)ceil(fabs(aBoundingBox[1][1] - aBoundingBox[0][1]));
 	Output_Size.width = Input_Size.width;
 	Output_Size.height = Input_Size.height;
 
 
 	/* 转换后的图像显存分配 */
-	float *output_image_gpu;  //旋转后
 	int nDstPitchCUDA = Output_Size.width * sizeof(float);
-	check1(cudaMalloc((void**)&output_image_gpu, sizeof(float)*Output_Size.width*Output_Size.height), "output_image_gpu cudaMalloc Error", __FILE__, __LINE__);
 
 
 	//输出感兴趣区的大小，相当于把输出图像再裁剪一遍，应该是这样，还没测试，这个有用
@@ -652,9 +633,6 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 		assert(nppRet == NPP_NO_ERROR);
 		check(cudaMemcpy(imageRotated3D_gpu + Input_Size.width*Input_Size.height * i, output_image_gpu, sizeof(float) * Output_Size.width*Output_Size.height, cudaMemcpyDeviceToDevice), "output_image cudaMemcpy Error");
 	}
-
-	//free(input_image_gpu);
-	//free(output_image_gpu);
 
 	return;
 }
@@ -775,6 +753,8 @@ void FishImageProcess::libtorchModelProcess()
 			cout << Moving2FixAM[aa] << "   ";
 		}
 	}
+
+	return;
 }
 
 
@@ -825,6 +805,8 @@ void FishImageProcess::freeMemory()
 	cudaFree(Ratio_Complex);
 	cudaFree(fftRatio);
 	cudaFree(gpuObjRecon_crop);
+	cudaFree(input_image_gpu);
+	cudaFree(output_image_gpu);
 
 	cout << "done" << endl;
 	
