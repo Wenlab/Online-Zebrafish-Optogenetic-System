@@ -29,9 +29,9 @@ int main()
 
 	myExp.initialize();
 
-	//thread galvoControlThread(&Experiment::galvoControl, &myExp);
-	//SetThreadPriority(galvoControlThread.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
-	//SetThreadAffinityMask(galvoControlThread.native_handle(), PROCESSOR_3_MASK);
+	thread galvoControlThread(&Experiment::galvoControl, &myExp);
+	SetThreadPriority(galvoControlThread.native_handle(), THREAD_PRIORITY_TIME_CRITICAL);
+	SetThreadAffinityMask(galvoControlThread.native_handle(), PROCESSOR_3_MASK);
 
 
 	thread cameraGrabLoopThread(&Experiment::readFullSizeImgFromFile, &myExp);   //文件接口
@@ -43,7 +43,7 @@ int main()
 	myExp.controlExp();
 
 
-	//galvoControlThread.join();
+	galvoControlThread.join();
 	cameraGrabLoopThread.join();
 	imgProcessLoopThread.join();
 	writeOutLoopThread.join();

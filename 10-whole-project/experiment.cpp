@@ -31,8 +31,11 @@ void Experiment::initialize()
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);  //关闭opencv的警告
 
 	Image = new unsigned short int[2048 * 2048 * 1];  //开辟缓存区
+	Image_forSave = new unsigned short int[2048 * 2048 * 1];
 	Image4bin = new unsigned short int[512 * 512 * 1];
 	mip_cpu = new float[200 * 200 * 1];
+
+	MIP = cv::Mat(200, 200, CV_32FC1, mip_cpu);
 
 	////初始化相机
 	cam_data = T2Cam_CreateCamData(); //动态申请CamData结构体的空间,创建指向该空间的cam_data指针
@@ -59,7 +62,6 @@ void Experiment::initialize()
 	fishImgProc.initialize();
 	cout << "initialize fishImgProc done" << endl;
 
-	MIP = cv::Mat(200, 200, CV_32FC1);
 
 	initializeWriteOut();
 	cout << "write out prepare done" << endl;
@@ -89,7 +91,8 @@ void Experiment::readFullSizeImgFromFile()
 		if (poDataset == NULL)
 		{
 			cout << "fail in open files!!!" << endl;
-			return;
+			//return;
+			continue;
 		}
 		int nImgSizeX = poDataset->GetRasterXSize();
 		int nImgSizeY = poDataset->GetRasterYSize();
@@ -119,7 +122,10 @@ void Experiment::readFullSizeImgFromFile()
 			free(pafScanline);
 		}
 
+		//delete poDataset;
+
 		resizeImg();
+
 		cout << "read img done: " << filename << endl;
 		frameNum = frameNum + 1;
 
@@ -203,6 +209,7 @@ void Experiment::ImgReconAndRegis()
 
 void Experiment::saveImg2Disk(string filename)
 {
+	memcpy(Image_forSave, Image, CCDSIZEX *CCDSIZEY * sizeof(unsigned short));
 	//输出图像
 	GDALDriver * pDriver = GetGDALDriverManager()->GetDriverByName("GTiff");
 	GDALDataset *ds = pDriver->Create(filename.c_str(), 2048, 2048, 1, GDT_UInt16, NULL);
@@ -219,14 +226,15 @@ void Experiment::saveImg2Disk(string filename)
 		{
 			for (int j = 0; j < 2048; j++)//列循环
 			{
-				writeOut_buffer[j] = Image[band * 2048 * 2048 + i * 2048 + j];
+				writeOut_buffer[j] = Image_forSave[band * 2048 * 2048 + i * 2048 + j];
 			}
 			ds->GetRasterBand(band + 1)->RasterIO(GF_Write, 0, i, 2048, 1, writeOut_buffer, 2048, 1, GDT_UInt16, 0, 0);
 		}
 		//cout << band << endl;
 	}
 	free(writeOut_buffer);
-	delete ds;
+	//delete ds;
+	//delete pDriver;
 
 	return;
 }
@@ -234,7 +242,12 @@ void Experiment::saveImg2Disk(string filename)
 void Experiment::getReconMIP()
 {
 	cudaMemcpy(mip_cpu, fishImgProc.image2D_XY_gpu, sizeof(float) * 200 * 200 * 1, cudaMemcpyDeviceToHost);
-	MIP = cv::Mat(200, 200, CV_32FC1, mip_cpu);
+	//MIP = cv::Mat(200, 200, CV_32FC1, mip_cpu);//重复创建mat导致内存泄露,画出来的MIP是正确的
+	//float val = MIP.at<float>(100, 100);
+	//cout << val << endl;
+
+	//MIP.data = (uchar*)mip_cpu;   //用这个方法赋值，内存不再泄露,但是画出来的MIP全是黑的
+	//memcpy(MIP.ptr<float>(0), mip_cpu, sizeof(float) * 200 * 200 * 1); //用这个方法赋值，内存不再泄露,但是画出来的MIP全是黑的
 
 	cv::normalize(MIP, MIP, 0, 1, cv::NormTypes::NORM_MINMAX);
 
@@ -285,7 +298,7 @@ void Experiment::getParamsFromGUI()
 		params.ysize = 95 - params.ypos;
 	roi = cv::Rect(params.xpos, params.ypos, params.xsize, params.ysize);
 
-	//cv::waitKey(1);
+	cv::waitKey(1);
 	return;
 }
 
@@ -293,16 +306,18 @@ void Experiment::getParamsFromGUI()
 void Experiment::drawGUIimg()
 {
 
-	ref_MIP = cv::Mat(200, 400, CV_8UC1, cv::Scalar(0));
-
+	cv::Mat ref_MIP(200, 400, CV_8UC1, cv::Scalar(0));
+	cv::Mat ref_resize;
 
 	//准备reference图像，ZBB
-	ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
+	cv::Mat ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
 	cv::rectangle(ref, roi, cv::Scalar(255), 2);
 	cv::resize(ref, ref_resize, cv::Size(ref.cols * 2, ref.rows * 2));
 	cv::Mat refROI = ref_MIP(cv::Rect(0, 0, ref_resize.cols, ref_resize.rows));
 	ref_resize.copyTo(refROI);
 
+
+	//cv::imshow("ttt", MIP);
 
 	//准备当前帧的MIP
 	cv::Mat MIP_8u = MIP.clone();
@@ -322,7 +337,8 @@ void Experiment::drawGUIimg()
 
 	cv::imshow("test", ref_mip_resize);
 
-	//cv::waitKey(1);
+
+	cv::waitKey(1);
 
 	return;
 }
@@ -405,8 +421,9 @@ void Experiment::imgProcess()
 			//time.start();
 			ImgReconAndRegis();
 			getReconMIP();
-			//frameCount_imgprocess = frameNum;
 			//generateGalvoVotages();
+			frameCount_imgprocess = frameNum;
+			cout << " ";   //这里必须有一句输出？？？
 			//time.stop();
 			//cout << "process time: " << time.getElapsedTimeInMilliSec() << endl;
 		}
@@ -445,7 +462,7 @@ void Experiment::controlExp()
 			}
 		}
 
-		cv::waitKey(1);
+		//cv::waitKey(1);
 	}
 
 	cout << "control thread say goodbye" << endl;
@@ -509,6 +526,7 @@ void Experiment::clear()
 	fishImgProc.freeMemory();
 
 	free(Image);
+	free(Image_forSave);
 	free(Image4bin);
 	free(mip_cpu);
 

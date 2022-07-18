@@ -712,6 +712,11 @@ void FishImageProcess::cropRotatedImage()
 	cudaDeviceSynchronize();
 	checkGPUStatus(cudaGetLastError(), "kernel_10 Error");
 
+	free(idx_2);
+	free(x);
+	free(y);
+	free(z);
+
 	if (DEBUG)
 	{
 		cout << "crop完成" << endl;
@@ -764,16 +769,18 @@ void FishImageProcess::libtorchModelProcess()
 std::vector<cv::Point3f> FishImageProcess::ZBB2FishTransform(cv::Rect roi)
 {
 
-	//cv::Rect lightArea(50, 50, 10, 10);
+	std::vector<cv::Point3f> regionInFish;
+
+
 	FishReg.getRegionFromUser(roi);
 	//从rotation/crop/affine的运算过程中获取数据
 	FishReg.getRotationMatrix(rotationAngleX, rotationAngleY);
 	FishReg.getCropPoint(cropPoint);
 	FishReg.getFix2MovingAffineMatrix(Moving2FixAM);
 
-	//cout << endl << "1111" << endl;
-	//坐标转换
-	std::vector<cv::Point3f> regionInFish = FishReg.ZBB2FishTransform();
+	////cout << endl << "1111" << endl;
+	////坐标转换
+	regionInFish = FishReg.ZBB2FishTransform();
 
 	
 	FishReg.clear();

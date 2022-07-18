@@ -26,6 +26,7 @@ public:
 	int frameNum;
 
 	unsigned short int *Image;
+	unsigned short int *Image_forSave;
 	unsigned short int *Image4bin;
 	float* mip_cpu;
 
@@ -43,9 +44,6 @@ public:
 	std::vector<cv::Point3f> ROIpoints;//坐标转换到鱼身上的点
 
 	cv::Mat MIP;
-	cv::Mat ref;
-	cv::Mat ref_resize;
-	cv::Mat ref_MIP;
 
 	Experiment(std::string modle_path);
 	~Experiment();
