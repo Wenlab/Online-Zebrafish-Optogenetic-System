@@ -32,7 +32,7 @@ public:
 	std::vector<float> Fix2MovingAM;
 	cv::Point3f cropPoint;
 	Eigen::Matrix3f rotationMatrix;
-	std::vector<cv::Point3f> regionInFish;   //to galvo
+	std::vector<cv::Point2f> regionInFish;   //to galvo
 
 	void initialize(std::string filename);
 	void getRegionFromUser(cv::Rect Reg);
@@ -41,7 +41,7 @@ public:
 	void getCropPoint(cv::Point3f pt);
 	void getRotationMatrix(float rotationAngleZ, float rotationAngleX);
 
-	std::vector<cv::Point3f> ZBB2FishTransform();
+	std::vector<cv::Point2f> ZBB2FishTransform();
 	std::vector<std::pair<std::string, cv::Point>> readZBBMapFromTxt(std::string file);
 	std::vector<std::vector<std::vector<std::string>>> makeZbbMapVec(std::vector<std::pair<std::string, cv::Point>> zbbMapPair);
 	std::vector<std::string> queryRegionName(cv::Rect region);

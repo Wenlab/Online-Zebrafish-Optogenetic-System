@@ -323,11 +323,27 @@ void Experiment::drawGUIimg()
 	cv::Mat MIP_8u = MIP.clone();
 	MIP_8u = (MIP_8u * 255);
 	MIP_8u.convertTo(MIP_8u, CV_8UC1);
-	for (int i = 0; i < ROIpoints.size(); i++)
+	//cout << "ROIpoints: " << ROIpoints.size() << endl;
+	if (ROIpoints.size() > 3)
 	{
-		cv::Point3f p = ROIpoints[i];
-		cv::circle(MIP_8u, cv::Point(p.x, p.y), 1, cv::Scalar(255));
+		cv::RotatedRect re = cv::minAreaRect(ROIpoints);
+		//获取旋转矩形的四个顶点
+		cv::Point2f* vertices = new cv::Point2f[4];
+		re.points(vertices);
+
+		//逐条边绘制
+		for (int j = 0; j < 4; j++)
+		{
+			cv::line(MIP_8u, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255),2);
+		}
 	}
+	//for (int i = 0; i < ROIpoints.size(); i++)
+	//{
+	//	cv::Point3f p = ROIpoints[i];
+	//	cv::circle(MIP_8u, cv::Point(p.x, p.y), 1, cv::Scalar(255));
+	//}
+
+
 	cv::Mat MIPROI = ref_MIP(cv::Rect(200, 0, MIP_8u.cols, MIP_8u.rows));
 	MIP_8u.copyTo(MIPROI);
 

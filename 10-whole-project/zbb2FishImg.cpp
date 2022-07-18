@@ -91,7 +91,7 @@ void zbb2FishImg::getRotationMatrix(float rotationAngleZ, float rotationAngleX)
 
 //将区域从ZBB上的选定坐标还原到fish
 //使用上面几个函数得到的信息
-std::vector<cv::Point3f> zbb2FishImg::ZBB2FishTransform()
+std::vector<cv::Point2f> zbb2FishImg::ZBB2FishTransform()
 {
 	//cout << "RegionCoord size " << RegionCoord.size() << endl;
 	for (int i = 0; i < RegionCoord.size(); i++)
@@ -103,7 +103,7 @@ std::vector<cv::Point3f> zbb2FishImg::ZBB2FishTransform()
 		p = p + cropPoint;
 		p = applyRotationMatrixOn3DCoord(p, rotationMatrix);
 
-		regionInFish.push_back(p);
+		regionInFish.push_back(cv::Point(p.x, p.y));
 	}
 
 	return regionInFish;

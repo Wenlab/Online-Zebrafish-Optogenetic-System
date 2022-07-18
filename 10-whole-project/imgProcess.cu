@@ -766,10 +766,10 @@ void FishImageProcess::libtorchModelProcess()
 }
 
 
-std::vector<cv::Point3f> FishImageProcess::ZBB2FishTransform(cv::Rect roi)
+std::vector<cv::Point2f> FishImageProcess::ZBB2FishTransform(cv::Rect roi)
 {
 
-	std::vector<cv::Point3f> regionInFish;
+	std::vector<cv::Point2f> regionInFish;
 
 
 	FishReg.getRegionFromUser(roi);

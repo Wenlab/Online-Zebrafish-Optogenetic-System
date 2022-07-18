@@ -41,7 +41,7 @@ public:
 	int UserWantToStop;
 
 	cv::Rect roi;//用户在ref上选的给光区域
-	std::vector<cv::Point3f> ROIpoints;//坐标转换到鱼身上的点
+	std::vector<cv::Point2f> ROIpoints;//坐标转换到鱼身上的点
 
 	cv::Mat MIP;
 

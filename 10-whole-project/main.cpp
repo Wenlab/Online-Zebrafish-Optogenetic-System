@@ -21,9 +21,6 @@ using namespace std;
 
 int main()
 {
-	
-	string afterResizeImgPath = "D:/kexin/Online-Zebrafish-Optogenetic/data/r20210824_X10_resize/";
-	_mkdir(afterResizeImgPath.data());
 
 	Experiment myExp("affineNetScript_TM_0621_3080.pt");
 
