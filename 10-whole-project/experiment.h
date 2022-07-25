@@ -1,12 +1,16 @@
 #pragma once
-#include"imgProcess.h"
-#include"Talk2Camera.h"
-#include"Talk2Galvo.h"
 
 #include<opencv2/opencv.hpp>
 #include<opencv2/highgui/highgui.hpp>
 #include<opencv2/core/core.hpp>
 #include<opencv2/imgproc/imgproc.hpp>
+
+#include"imgProcess.h"
+#include"Talk2Camera.h"
+#include"Talk2Galvo.h"
+#include"TCPserver.h"
+
+
 
 
 
@@ -65,6 +69,10 @@ public:
 	double scale;
 	std::vector<cv::Point2f> galvoVotagesPairs;
 
+
+	//TCP server
+	TCPServer server;
+
 	void initialize();
 	void resizeImg();
 	void ImgReconAndRegis();
@@ -84,6 +92,8 @@ public:
 	void generateGalvoVotages();
 
 
+	
+
 	void clear();
 	void exit();
 
@@ -91,6 +101,7 @@ public:
 	void writeOutData();
 	void imgProcess();
 	void galvoControl();
+	void TCPconnect();
 	void readFullSizeImgFromFile();
 	void readFullSizeImgFromCamera();
 

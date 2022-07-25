@@ -531,58 +531,59 @@ void FishImageProcess::cropReconImage()
 
 void FishImageProcess::matchingANDrotationXY()
 {
-	/*   XY平面的模板匹配和旋转   */
-	if (DEBUG)
-	{
-		cout << "start XY 2D template matching..." << endl;
-	}
+	///*   XY平面的模板匹配和旋转   */
+	//if (DEBUG)
+	//{
+	//	cout << "start XY 2D template matching..." << endl;
+	//}
+	////GET MIP
 	dim3 block_1(32, 32, 1);
 	dim3 grid_1((200 + block_1.x - 1) / block_1.x, (200 + block_1.y - 1) / block_1.y, 1);
 	kernel_1 << <grid_1, block_1 >> > (gpuObjRecon_crop, 200, 200, image2D_XY_gpu);   
 	cudaDeviceSynchronize();
 	checkGPUStatus(cudaGetLastError(), "kernel_1 Error");
 
-	thrust::device_ptr<float> dev_ptr(image2D_XY_gpu);
-	double image2D_XY_mean = thrust::reduce(dev_ptr, dev_ptr + size_t(200 * 200), (float)0, thrust::plus<float>()) / (200 * 200);
-	if (DEBUG)
-	{
-		cout << "image2D_XY_mean: " << image2D_XY_mean << endl;
-	}
+	//thrust::device_ptr<float> dev_ptr(image2D_XY_gpu);
+	//double image2D_XY_mean = thrust::reduce(dev_ptr, dev_ptr + size_t(200 * 200), (float)0, thrust::plus<float>()) / (200 * 200);
+	//if (DEBUG)
+	//{
+	//	cout << "image2D_XY_mean: " << image2D_XY_mean << endl;
+	//}
 
-	int threadNum_2 = 256;
-	int blockNum_2 = (200 * 200 - 1) / threadNum_2 + 1;
-	kernel_2 << <blockNum_2, threadNum_2 >> > (image2D_XY_gpu, 200 * 200, image2D_XY_mean, img2DBW_XY_gpu);
-	cudaDeviceSynchronize();
-	checkGPUStatus(cudaGetLastError(), "kernel_2 Error");
+	//int threadNum_2 = 256;
+	//int blockNum_2 = (200 * 200 - 1) / threadNum_2 + 1;
+	//kernel_2 << <blockNum_2, threadNum_2 >> > (image2D_XY_gpu, 200 * 200, image2D_XY_mean, img2DBW_XY_gpu);
+	//cudaDeviceSynchronize();
+	//checkGPUStatus(cudaGetLastError(), "kernel_2 Error");
 
-	int threadNum_3 = 256;
-	int blockNum_3 = (rotationAngleXY_size - 1) / threadNum_2 + 1;
-	kernel_3 << <blockNum_3, threadNum_3 >> > (template_roXY_gpu, img2DBW_XY_gpu, rotationAngleXY_size, err_XY_gpu);
-	cudaDeviceSynchronize();
-	checkGPUStatus(cudaGetLastError(), "kernel_3 Error");
+	//int threadNum_3 = 256;
+	//int blockNum_3 = (rotationAngleXY_size - 1) / threadNum_2 + 1;
+	//kernel_3 << <blockNum_3, threadNum_3 >> > (template_roXY_gpu, img2DBW_XY_gpu, rotationAngleXY_size, err_XY_gpu);
+	//cudaDeviceSynchronize();
+	//checkGPUStatus(cudaGetLastError(), "kernel_3 Error");
 
 
-	//求err_XY_gpu的最小值
-	double *err_XY = new double[rotationAngleXY_size];
-	check(cudaMemcpy(err_XY, err_XY_gpu, sizeof(double)*rotationAngleXY_size, cudaMemcpyDeviceToHost), "err_XY cudaMemcpy Error");
-	double err_XY_min = DBL_MAX;
-	int idx;  //找到最小值对应的索引
-	for (int i = 0; i < rotationAngleXY_size; i++)
-	{
-		//cout << i << "   " << err_XY[i] << endl;
-		if (err_XY[i] < err_XY_min)
-		{
-			err_XY_min = err_XY[i];
-			idx = i;
-		}
-	}
-	//cout << "err_XY_min: " << err_XY_min << endl;
-	//cout << "rotation XY idx: " << idx << endl;
-	//第一次旋转
-	rotationAngleX = -rotationAngleXY[idx];
-	rotationAngleY = 0;
-
-	ObjRecon_imrotate3_gpu(gpuObjRecon_crop, rotationAngleX, imageRotated3D_gpu);
+	////求err_XY_gpu的最小值
+	//double *err_XY = new double[rotationAngleXY_size];
+	//check(cudaMemcpy(err_XY, err_XY_gpu, sizeof(double)*rotationAngleXY_size, cudaMemcpyDeviceToHost), "err_XY cudaMemcpy Error");
+	//double err_XY_min = DBL_MAX;
+	//int idx;  //找到最小值对应的索引
+	//for (int i = 0; i < rotationAngleXY_size; i++)
+	//{
+	//	//cout << i << "   " << err_XY[i] << endl;
+	//	if (err_XY[i] < err_XY_min)
+	//	{
+	//		err_XY_min = err_XY[i];
+	//		idx = i;
+	//	}
+	//}
+	////cout << "err_XY_min: " << err_XY_min << endl;
+	////cout << "rotation XY idx: " << idx << endl;
+	////第一次旋转
+	//rotationAngleX = -rotationAngleXY[idx];
+	//rotationAngleY = 0;
+	//rotationAngleX = 166;
+	ObjRecon_imrotate3_gpu(gpuObjRecon_crop, -rotationAngleX, imageRotated3D_gpu);
 
 	if (DEBUG)
 	{
@@ -712,10 +713,10 @@ void FishImageProcess::cropRotatedImage()
 	cudaDeviceSynchronize();
 	checkGPUStatus(cudaGetLastError(), "kernel_10 Error");
 
-	free(idx_2);
-	free(x);
-	free(y);
-	free(z);
+	delete[] idx_2;
+	delete[] x;
+	delete[] y;
+	delete[] z;
 
 	if (DEBUG)
 	{
@@ -774,7 +775,7 @@ std::vector<cv::Point2f> FishImageProcess::ZBB2FishTransform(cv::Rect roi)
 
 	FishReg.getRegionFromUser(roi);
 	//从rotation/crop/affine的运算过程中获取数据
-	FishReg.getRotationMatrix(rotationAngleX, rotationAngleY);
+	FishReg.getRotationMatrix(-rotationAngleX, rotationAngleY);
 	FishReg.getCropPoint(cropPoint);
 	FishReg.getFix2MovingAffineMatrix(Moving2FixAM);
 
@@ -822,8 +823,8 @@ void FishImageProcess::freeMemory()
 	
 	cout << "free cpu memory..." << endl;
 
-	free(cpuObjRecon);
-	free(cpuObjRecon_crop);
+	delete[] cpuObjRecon;
+	delete[] cpuObjRecon_crop;
 
 	cout << "done" << endl;
 	return;

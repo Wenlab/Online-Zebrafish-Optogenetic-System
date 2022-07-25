@@ -173,7 +173,7 @@ void saveAndCheckImage(float* imageData, int col_total, int row_total, int z_tot
 		//cout << band << endl;
 	}
 	//fout.close();
-	delete ds;
+	delete[] ds;
 	free(ObjRecon_buffer);
 
 

@@ -75,8 +75,8 @@ public:
 	float *ObjCropRed_gpu;    //crop结果
 
 	//坐标转换
-	int rotationAngleX;
-	int rotationAngleY;
+	int rotationAngleX = 0;
+	int rotationAngleY = 0;
 	cv::Point3d cropPoint;
 	std::vector<float> Moving2FixAM;
 	zbb2FishImg FishReg;

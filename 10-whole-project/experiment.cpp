@@ -62,11 +62,12 @@ void Experiment::initialize()
 	fishImgProc.initialize();
 	cout << "initialize fishImgProc done" << endl;
 
-
 	initializeWriteOut();
 	cout << "write out prepare done" << endl;
 	setupGUI();
 	cout << "GUI prepare done" << endl;
+
+
 
 	frameNum = 0;
 	recordOn = 0;
@@ -119,7 +120,7 @@ void Experiment::readFullSizeImgFromFile()
 					//cout << Image[(bandind - 1) * nImgSizeX * nImgSizeY + i * nImgSizeY + j] << endl;
 				}
 			}
-			free(pafScanline);
+			delete[] pafScanline;
 		}
 
 		//delete poDataset;
@@ -232,7 +233,7 @@ void Experiment::saveImg2Disk(string filename)
 		}
 		//cout << band << endl;
 	}
-	free(writeOut_buffer);
+	delete[] writeOut_buffer;
 	//delete ds;
 	//delete pDriver;
 
@@ -372,14 +373,22 @@ void Experiment::initializeWriteOut()
 	cout << "please input fish age (e.g: 9)" << endl;
 	cin >> fishage;
 
-	folderName = path + time + "_" + fishtype + "_" + fishage + "dpf" + "/";
+	string fishName = time + "_" + fishtype + "_" + fishage + "dpf";
+	folderName = path + fishName + "/";
 	int ret = _access(folderName.c_str(), 0);
 	if (ret != 0)
 	{
 		_mkdir(folderName.c_str());
 	}
 
-	txtName = path + time + "_" + fishtype + "_" + fishage + "dpf" + ".txt";
+	folderName = folderName + "/raw/";
+	ret = _access(folderName.c_str(), 0);
+	if (ret != 0)
+	{
+		_mkdir(folderName.c_str());
+	}
+
+	txtName = path + fishName + "/"+ fishName +".txt";
 	outTXT.open(txtName);
 
 	return;
@@ -536,15 +545,39 @@ void Experiment::galvoControl()
 	return;
 }
 
+
+void Experiment::TCPconnect()
+{
+	cout << "I'm TCP server thread!!" << endl;
+	server.initialize();
+	while (!UserWantToStop)
+	{
+		server.receive();
+		if (server.data != 0)
+		{
+			fishImgProc.rotationAngleX = server.data;
+			//cout << fishImgProc.rotationAngleX << endl;
+		}
+		//fishImgProc.rotationAngleX = server.data;
+		//cout << server.data << endl;
+	}
+
+	server.close();
+	cout << "TCP server thread say goodbye!!" << endl;
+	return;
+}
+
+
+
 void Experiment::clear()
 {
 	outTXT.close();
 	fishImgProc.freeMemory();
 
-	free(Image);
-	free(Image_forSave);
-	free(Image4bin);
-	free(mip_cpu);
+	delete[] Image;
+	delete[] Image_forSave;
+	delete[] Image4bin;
+	delete[] mip_cpu;
 
 	cv::destroyAllWindows();
 
@@ -559,6 +592,7 @@ void Experiment::clear()
 	cout << "clear exp" << endl;
 	return;
 }
+
 
 
 void Experiment::exit()

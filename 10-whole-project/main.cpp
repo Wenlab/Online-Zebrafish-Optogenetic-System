@@ -35,6 +35,7 @@ int main()
 	//thread cameraGrabLoopThread(&Experiment::readFullSizeImgFromCamera, &myExp);   //相机接口
 	thread imgProcessLoopThread(&Experiment::imgProcess, &myExp);
 	thread writeOutLoopThread(&Experiment::writeOutData, &myExp);
+	thread TCPconnectLoopThread(&Experiment::TCPconnect, &myExp);
 
 
 	myExp.controlExp();
@@ -44,6 +45,7 @@ int main()
 	cameraGrabLoopThread.join();
 	imgProcessLoopThread.join();
 	writeOutLoopThread.join();
+	TCPconnectLoopThread.join();
 
 
 	myExp.clear();
