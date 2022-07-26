@@ -49,8 +49,9 @@ public:
 
 	cv::Mat MIP;
 
-	Experiment(std::string modle_path);
-	~Experiment();
+	//相机图像读进来，截断亮度700以上的像素
+	int maxValue;
+	int thre;
 
 
 	FishImageProcess fishImgProc;
@@ -73,6 +74,9 @@ public:
 	//TCP server
 	TCPServer server;
 
+	Experiment(std::string modle_path);
+	~Experiment();
+
 	void initialize();
 	void resizeImg();
 	void ImgReconAndRegis();
@@ -92,7 +96,7 @@ public:
 	void generateGalvoVotages();
 
 
-	
+	void preProcessImg();
 
 	void clear();
 	void exit();
@@ -105,7 +109,7 @@ public:
 	void readFullSizeImgFromFile();
 	void readFullSizeImgFromCamera();
 
-	void flipImage();
+
 
 private:
 

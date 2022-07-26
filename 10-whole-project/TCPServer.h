@@ -20,7 +20,10 @@ public:
 
 	void initialize();
 
-	void receive();
+	int waitingConnect();
+
+	int receive();
+
 
 	void close();
 

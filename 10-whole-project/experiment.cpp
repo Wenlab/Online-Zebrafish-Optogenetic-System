@@ -17,7 +17,8 @@ using namespace std;
 
 Experiment::Experiment(std::string modle_path) :fishImgProc(modle_path)
 {
-
+	maxValue = 65535;
+	thre = 800;
 }
 
 Experiment::~Experiment()
@@ -161,7 +162,7 @@ void Experiment::readFullSizeImgFromCamera()
 			break;
 		}
 
-		flipImage();
+		preProcessImg();
 		resizeImg();
 		frameNum = frameNum + 1;
 	}
@@ -172,10 +173,11 @@ void Experiment::readFullSizeImgFromCamera()
 	return;
 }
 
-void Experiment::flipImage()
+void Experiment::preProcessImg()
 {
 	cv::Mat temp(cv::Size(CCDSIZEX, CCDSIZEY), CV_16UC1, Image);
 	cv::flip(temp, temp, 0);   //flipcode=0,垂直翻转图像
+	cv::threshold(temp, temp, thre, maxValue, CV_THRESH_TRUNC);   //高于thre的数据被置为thre
 
 	return;
 }
@@ -552,14 +554,29 @@ void Experiment::TCPconnect()
 	server.initialize();
 	while (!UserWantToStop)
 	{
-		server.receive();
-		if (server.data != 0)
+
+		if (server.waitingConnect())
 		{
-			fishImgProc.rotationAngleX = server.data;
-			//cout << fishImgProc.rotationAngleX << endl;
+			while (!UserWantToStop)
+			{
+				int isOK = server.receive();
+				if (server.data != 0)
+				{
+					fishImgProc.rotationAngleX = server.data;
+					//cout << fishImgProc.rotationAngleX << endl;
+				}
+				//fishImgProc.rotationAngleX = server.data;
+				//cout << server.data << endl;
+				if (!isOK)
+				{
+					printf("lose client!!\n");
+					//printf("wait for a new connection!!\n");
+					cout << endl;
+					closesocket(server.socketConn2);
+					break;
+				}
+			}
 		}
-		//fishImgProc.rotationAngleX = server.data;
-		//cout << server.data << endl;
 	}
 
 	server.close();

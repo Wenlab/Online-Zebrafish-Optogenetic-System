@@ -43,28 +43,38 @@ void TCPServer::initialize()
 		return;
 	}
 
+	return;
+}
+
+
+int TCPServer::waitingConnect()
+{
 	SOCKADDR_IN addrClient;
 	int len = sizeof(SOCKADDR);
 
 	std::cout << "wait new connect......" << std::endl;
 	socketConn2 = accept(server_, (SOCKADDR*)&addrClient, &len);
+	if (socketConn2 == INVALID_SOCKET)
+	{
+		return 0;
+	}
 
-	int Timeout = 4;
+	int Timeout = 4;   //ms
 	setsockopt(socketConn2, SOL_SOCKET, SO_RCVTIMEO, (char*)&Timeout, sizeof(int));
 
 	if (socketConn2 == SOCKET_ERROR)
 	{
 		std::cout << " accept error" << WSAGetLastError();
-		return;
+		return 0;
 	}
 	std::cout << "connect successful" << std::endl;
-
-	return;
+	return 1;
 }
 
 
 
-void TCPServer::receive()
+
+int TCPServer::receive()
 {
 	char recvBuff[1024];
 	memset(recvBuff, 0, sizeof(recvBuff));
@@ -72,11 +82,17 @@ void TCPServer::receive()
 
 	//std::cout << "client say:" << recvBuff << std::endl;
 
-	data = string2int(recvBuff);   //这一句会导致程序卡住？？？
+	data = string2int(recvBuff);   
 	//cout << data << endl;
+	int is_ok;
+	is_ok = (WSAECONNRESET != WSAGetLastError());
 
 	Sleep(1);
+
+	return is_ok;
 }
+
+
 
 void TCPServer::close()
 {
