@@ -73,6 +73,10 @@ public:
 	//crop
 	float *cpuObjRotation_crop;
 	float *ObjCropRed_gpu;    //crop结果
+	float* imageRotated2D_XY_GPU;
+	float* imageRotated2D_XY_BW_GPU;
+	float* imageRotated2D_XY_BW_CPU;
+
 
 	//坐标转换
 	int rotationAngleX = 0;

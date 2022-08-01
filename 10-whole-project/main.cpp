@@ -14,7 +14,7 @@
 #include"kexinLibs.h"
 
 #include <direct.h> //_mkdir fun
-#include "main.h"
+
 
 
 using namespace std;

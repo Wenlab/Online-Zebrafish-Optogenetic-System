@@ -16,10 +16,12 @@
 
 struct OptogeneticParams
 {
-	int xsize = 10;
-	int xpos = 10;
+	int xsize = 10; //光遗传选区的大小
+	int xpos = 10;  //光遗传选区的位置
 	int ysize = 10;
 	int ypos = 10;
+	int xbias = 5;  //按照threshold，选取鱼的包围矩形，包围矩形左上点与选取点的bias
+	int ybias = 5;
 	int laserTime = 2000;
 	int laserOn = 0;
 };

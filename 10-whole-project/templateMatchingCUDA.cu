@@ -154,3 +154,16 @@ __global__ void kernel_10(float *imageRotated3D_gpu, float *ObjReconRed_gpu, int
 	}
 
 }
+
+__global__ void kernel_11(float *imageRotated3D_gpu, float *ObjReconRed_gpu, int XObj, int YObj, int ZObj, int Corner0, int Corner2)
+{
+	const int x = blockDim.x * blockIdx.x + threadIdx.x;//XObj
+	const int y = blockDim.y * blockIdx.y + threadIdx.y;//YObj
+	const int z = blockDim.z * blockIdx.z + threadIdx.z;//ZObj
+
+	if (z < ZObj && x < XObj && y < YObj)
+	{
+		ObjReconRed_gpu[z*XObj*YObj + y * XObj + x] = imageRotated3D_gpu[z * 200 * 200 + (Corner0 + y) * 200 + Corner2 + x];
+	}
+
+}

@@ -60,3 +60,5 @@ __global__ void kernel_8(float *imageRotated3D_gpu_2, float *imageRotated3D_gpu)
 __global__ void kernel_9(float *imageRotated3D_gpu, double imageRotated3D_x_mean, int *BWObjRecon_gpu);
 
 __global__ void kernel_10(float *imageRotated3D_gpu, float *ObjReconRed_gpu, int XObj, int YObj, int ZObj, int CentroID0, int CentroID2);
+
+__global__ void kernel_11(float *imageRotated3D_gpu, float *ObjReconRed_gpu, int XObj, int YObj, int ZObj, int Corner0, int Corner2);

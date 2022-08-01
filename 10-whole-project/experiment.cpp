@@ -365,7 +365,7 @@ void Experiment::drawGUIimg()
 
 void Experiment::initializeWriteOut()
 {
-	string path = "D:/kexin/Online-Zebrafish-Optogenetic/data/testWriteOut/";
+	string path = "E:/online-opto-data/";
 	// change to you own data path
 	string time = getTime();
 	string fishtype;
