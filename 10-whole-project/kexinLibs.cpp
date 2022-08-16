@@ -173,13 +173,49 @@ void saveAndCheckImage(float* imageData, int col_total, int row_total, int z_tot
 		//cout << band << endl;
 	}
 	//fout.close();
-	delete[] ds;
-	free(ObjRecon_buffer);
+	//delete[] ds;
+	delete[] ObjRecon_buffer;
 
 
 	return;
 }
 
+
+void saveAndCheckImage(unsigned short int* imageData, int col_total, int row_total, int z_total, string name)
+{
+	//cout << col_total << "  " << row_total << " " << z_total << endl;
+
+	//输出图像
+	GDALDriver * pDriver = GetGDALDriverManager()->GetDriverByName("GTiff");
+	GDALDataset *ds = pDriver->Create(name.c_str(), col_total, row_total, z_total, GDT_UInt16, NULL);
+	if (ds == NULL)
+	{
+		cout << "Failed to create output file!" << endl;
+		system("pause");
+		return;
+	}
+	//ofstream fout(path + name + ".txt", ios::out);
+	//fout << setprecision(9);
+	unsigned short int *ObjRecon_buffer = new unsigned short int[col_total];
+	for (int band = 0; band < z_total; band++)
+	{
+		for (int i = 0; i < row_total; i++)//行循环
+		{
+			for (int j = 0; j < col_total; j++)//列循环
+			{
+				ObjRecon_buffer[j] = imageData[band * col_total * row_total + i * col_total + j];
+			}
+			ds->GetRasterBand(band + 1)->RasterIO(GF_Write, 0, i, col_total, 1, ObjRecon_buffer, col_total, 1, GDT_UInt16, 0, 0);
+		}
+		//cout << band << endl;
+	}
+	//fout.close();
+	//delete[] ds;
+	delete[] ObjRecon_buffer;
+
+
+	return;
+}
 
 void getFileNames(std::string path, std::vector<std::string>& files)
 {

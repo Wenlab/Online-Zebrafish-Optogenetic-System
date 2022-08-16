@@ -35,6 +35,7 @@ public:
 	unsigned short int *Image_forSave;
 	unsigned short int *Image4bin;
 	float* mip_cpu;
+	float* cropResult_cpu;
 
 	//cameras
 	AT_H cam_handle; //相机句柄变量的声明,随后将再初始化时为其赋值,之后用它来传递相机信息
@@ -59,7 +60,8 @@ public:
 	FishImageProcess fishImgProc;
 
 	//write out
-	std::string folderName;
+	std::string rawfolderName;
+	std::string cropfolderName;
 	std::string txtName;
 	std::ofstream outTXT;
 
@@ -82,7 +84,7 @@ public:
 	void initialize();
 	void resizeImg();
 	void ImgReconAndRegis();
-	void saveImg2Disk(std::string filename);
+	//void saveImg2Disk(std::string filename);
 
 	void getReconMIP();
 

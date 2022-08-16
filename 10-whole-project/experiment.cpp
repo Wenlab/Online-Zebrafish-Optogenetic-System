@@ -35,6 +35,7 @@ void Experiment::initialize()
 	Image_forSave = new unsigned short int[2048 * 2048 * 1];
 	Image4bin = new unsigned short int[512 * 512 * 1];
 	mip_cpu = new float[200 * 200 * 1];
+	cropResult_cpu = new float[76 * 95 * 50]();
 
 	MIP = cv::Mat(200, 200, CV_32FC1, mip_cpu);
 
@@ -210,37 +211,39 @@ void Experiment::ImgReconAndRegis()
 	return;
 }
 
-void Experiment::saveImg2Disk(string filename)
-{
-	memcpy(Image_forSave, Image, CCDSIZEX *CCDSIZEY * sizeof(unsigned short));
-	//输出图像
-	GDALDriver * pDriver = GetGDALDriverManager()->GetDriverByName("GTiff");
-	GDALDataset *ds = pDriver->Create(filename.c_str(), 2048, 2048, 1, GDT_UInt16, NULL);
-	if (ds == NULL)
-	{
-		cout << "Failed to create output file!" << endl;
-		system("pause");
-		return;
-	}
-	unsigned short int *writeOut_buffer = new unsigned short int[2048];
-	for (int band = 0; band < 1; band++)
-	{
-		for (int i = 0; i < 2048; i++)//行循环
-		{
-			for (int j = 0; j < 2048; j++)//列循环
-			{
-				writeOut_buffer[j] = Image_forSave[band * 2048 * 2048 + i * 2048 + j];
-			}
-			ds->GetRasterBand(band + 1)->RasterIO(GF_Write, 0, i, 2048, 1, writeOut_buffer, 2048, 1, GDT_UInt16, 0, 0);
-		}
-		//cout << band << endl;
-	}
-	delete[] writeOut_buffer;
-	//delete ds;
-	//delete pDriver;
-
-	return;
-}
+//
+////改成可存储任意大小的图像
+//void Experiment::saveImg2Disk(string filename)
+//{
+//	memcpy(Image_forSave, Image, CCDSIZEX *CCDSIZEY * sizeof(unsigned short));
+//	//输出图像
+//	GDALDriver * pDriver = GetGDALDriverManager()->GetDriverByName("GTiff");
+//	GDALDataset *ds = pDriver->Create(filename.c_str(), 2048, 2048, 1, GDT_UInt16, NULL);
+//	if (ds == NULL)
+//	{
+//		cout << "Failed to create output file!" << endl;
+//		system("pause");
+//		return;
+//	}
+//	unsigned short int *writeOut_buffer = new unsigned short int[2048];
+//	for (int band = 0; band < 1; band++)
+//	{
+//		for (int i = 0; i < 2048; i++)//行循环
+//		{
+//			for (int j = 0; j < 2048; j++)//列循环
+//			{
+//				writeOut_buffer[j] = Image_forSave[band * 2048 * 2048 + i * 2048 + j];
+//			}
+//			ds->GetRasterBand(band + 1)->RasterIO(GF_Write, 0, i, 2048, 1, writeOut_buffer, 2048, 1, GDT_UInt16, 0, 0);
+//		}
+//		//cout << band << endl;
+//	}
+//	delete[] writeOut_buffer;
+//	//delete ds;
+//	//delete pDriver;
+//
+//	return;
+//}
 
 void Experiment::getReconMIP()
 {
@@ -370,6 +373,12 @@ void Experiment::drawGUIimg()
 
 void Experiment::initializeWriteOut()
 {
+	//初始化GDLA
+	GDALAllRegister(); OGRRegisterAll();
+	//设置支持中文路径
+	CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+	CPLSetConfigOption("SHAPE_ENCODING", "");
+
 	string path = "E:/online-opto-data/";
 	// change to you own data path
 	string time = getTime();
@@ -381,18 +390,24 @@ void Experiment::initializeWriteOut()
 	cin >> fishage;
 
 	string fishName = time + "_" + fishtype + "_" + fishage + "dpf";
-	folderName = path + fishName + "/";
+	string folderName = path + fishName + "/";
 	int ret = _access(folderName.c_str(), 0);
 	if (ret != 0)
 	{
 		_mkdir(folderName.c_str());
 	}
 
-	folderName = folderName + "/raw/";
-	ret = _access(folderName.c_str(), 0);
+	rawfolderName = folderName + "/raw/";
+	cropfolderName = folderName + "/crop/";
+	ret = _access(rawfolderName.c_str(), 0);
 	if (ret != 0)
 	{
-		_mkdir(folderName.c_str());
+		_mkdir(rawfolderName.c_str());
+	}
+	ret = _access(cropfolderName.c_str(), 0);
+	if (ret != 0)
+	{
+		_mkdir(cropfolderName.c_str());
 	}
 
 	txtName = path + fishName + "/"+ fishName +".txt";
@@ -429,7 +444,10 @@ void Experiment::writeOutData()
 		{
 			if (frameCount_writeOut != frameNum)
 			{
-				saveImg2Disk(folderName + "/" + int2string(6, frameNum) + ".tif");
+				//saveImg2Disk(folderName + "/" + int2string(6, frameNum) + ".tif");
+				saveAndCheckImage(Image, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
+				cudaMemcpy(cropResult_cpu, fishImgProc.ObjCropRed_gpu, sizeof(float) * 76 * 95 * 50, cudaMemcpyDeviceToHost);
+				saveAndCheckImage(cropResult_cpu, 76, 95, 50, cropfolderName + "/" + int2string(6, frameNum) + ".tif");
 				writeOutTxt();
 				frameCount_writeOut = frameNum;
 			}
@@ -516,11 +534,7 @@ void Experiment::generateGalvoVotages()
 		float* Ydata = galvoMatrixY.ptr<float>(p.x);
 		float galvo_y = Ydata[p.y];
 		galvoVotagesPairs.push_back(cv::Point2f(galvo_x, galvo_y));
-		//cout << p << endl;
-		//cout << cv::Point2f(galvo_x, galvo_y) << endl;
 	}
-
-	//cout << "galvoVotagesPairs.size(): " << galvoVotagesPairs.size() << endl;
 }
 
 void Experiment::galvoControl()
@@ -607,6 +621,7 @@ void Experiment::clear()
 	delete[] Image_forSave;
 	delete[] Image4bin;
 	delete[] mip_cpu;
+	delete[] cropResult_cpu;
 
 	cv::destroyAllWindows();
 
