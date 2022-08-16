@@ -29,14 +29,29 @@ void zbb2FishImg::getRegionFromUser(cv::Rect Reg)
 	Region = Reg;
 
 	//将区域转化成坐标
+	bool inverse = false;
 	for (int i = Region.x; i < Region.x + Region.width; i++)
 	{
-		for (int j = Region.y; j < Region.y + Region.height; j++)
+		if (!inverse)
 		{
-			Point3f temp{ (float)i,(float)j,0 };
-			RegionCoord.push_back(temp);
-			//cout << temp << endl;
+			for (int j = Region.y; j < Region.y + Region.height; j++)
+			{
+				Point3f temp{ (float)i,(float)j,0 };
+				RegionCoord.push_back(temp);
+				//cout << temp << endl;
+			}
 		}
+		if (inverse)
+		{
+			for (int j = Region.y + Region.height; j > Region.y; j--)
+			{
+				Point3f temp{ (float)i,(float)j,0 };
+				RegionCoord.push_back(temp);
+				//cout << temp << endl;
+			}
+		}
+
+		inverse = !inverse;
 	}
 
 	//查询该区域包含的脑区

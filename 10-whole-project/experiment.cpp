@@ -18,7 +18,7 @@ using namespace std;
 Experiment::Experiment(std::string modle_path) :fishImgProc(modle_path)
 {
 	maxValue = 65535;
-	thre = 800;
+	thre = 1000;
 }
 
 Experiment::~Experiment()
@@ -201,7 +201,7 @@ void Experiment::ImgReconAndRegis()
 	//rotation
 	fishImgProc.matchingANDrotationXY();
 	//crop
-	fishImgProc.cropRotatedImage();
+	fishImgProc.cropRotatedImage(params.xbias, params.ybias);
 	////crop的结果构建movingTensor，和fixTensor一起送入网络处理
 	fishImgProc.libtorchModelProcess();
 	////结合rotation/crop/affine的数据做坐标转换
@@ -262,7 +262,7 @@ void Experiment::setupGUI()
 	//set up GUI
 	cout << "creating control panel for optogenetic..." << endl;
 	cv::namedWindow("Control Panel for Optogenetic", cv::WINDOW_NORMAL);
-	cv::resizeWindow("Control Panel for Optogenetic", 600, 400);
+	cv::resizeWindow("Control Panel for Optogenetic", 700, 500);
 
 	cv::createTrackbar("recordOn", "Control Panel for Optogenetic", &recordOn, 1);
 	cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
@@ -271,6 +271,9 @@ void Experiment::setupGUI()
 	cv::createTrackbar("ysize", "Control Panel for Optogenetic", &params.ysize, 20);
 	cv::createTrackbar("xpos", "Control Panel for Optogenetic", &params.xpos, 76);
 	cv::createTrackbar("ypos", "Control Panel for Optogenetic", &params.ypos, 95);
+	cv::createTrackbar("xbias", "Control Panel for Optogenetic", &params.xbias, 20);
+	cv::createTrackbar("ybias", "Control Panel for Optogenetic", &params.ybias, 20);
+
 	cv::createTrackbar("Stop", "Control Panel for Optogenetic", &UserWantToStop, 1);
 	
 	cv::waitKey(1);
@@ -290,6 +293,8 @@ void Experiment::getParamsFromGUI()
 	params.ysize = cv::getTrackbarPos("ysize", "Control Panel for Optogenetic");
 	params.xpos = cv::getTrackbarPos("xpos", "Control Panel for Optogenetic");
 	params.ypos = cv::getTrackbarPos("ypos", "Control Panel for Optogenetic");
+	params.xbias = cv::getTrackbarPos("xbias", "Control Panel for Optogenetic");
+	params.ybias = cv::getTrackbarPos("ybias", "Control Panel for Optogenetic");
 
 	UserWantToStop = cv::getTrackbarPos("Stop", "Control Panel for Optogenetic");
 
@@ -447,8 +452,8 @@ void Experiment::imgProcess()
 		{
 			//time.start();
 			ImgReconAndRegis();
+			
 			getReconMIP();
-			//generateGalvoVotages();
 			frameCount_imgprocess = frameNum;
 			cout << " ";   //这里必须有一句输出？？？
 			//time.stop();
@@ -506,12 +511,16 @@ void Experiment::generateGalvoVotages()
 	for (int i = 0; i < ROIpoints.size(); i++)
 	{
 		cv::Point p = cv::Point(ROIpoints[i].x, ROIpoints[i].y);
-		float* Xdata = galvoMatrixY.ptr<float>(p.x);
-		float galvo_x = Xdata[i];
-		float* Ydata = galvoMatrixX.ptr<float>(p.y);
-		float galvo_y = Ydata[i];
+		float* Xdata = galvoMatrixX.ptr<float>(p.x);
+		float galvo_x = Xdata[p.y];
+		float* Ydata = galvoMatrixY.ptr<float>(p.x);
+		float galvo_y = Ydata[p.y];
 		galvoVotagesPairs.push_back(cv::Point2f(galvo_x, galvo_y));
+		//cout << p << endl;
+		//cout << cv::Point2f(galvo_x, galvo_y) << endl;
 	}
+
+	//cout << "galvoVotagesPairs.size(): " << galvoVotagesPairs.size() << endl;
 }
 
 void Experiment::galvoControl()
@@ -519,14 +528,17 @@ void Experiment::galvoControl()
 	cout << "I'm galvo thread." << endl;
 	while (!UserWantToStop)
 	{
+		
 		bool read_inverse = false;
 		while (params.laserOn)
 		{
+			generateGalvoVotages();
 			if (read_inverse)
 			{
 				for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)
 				{
 					galvo.spinGalvo(galvoVotagesPairs[a]);
+					//cout << galvoVotagesPairs[a] << endl;
 				}
 				read_inverse = false;
 			}
@@ -560,7 +572,7 @@ void Experiment::TCPconnect()
 			while (!UserWantToStop)
 			{
 				int isOK = server.receive();
-				if (server.data != 0)
+				if (server.data >0&&server.data<=360)
 				{
 					fishImgProc.rotationAngleX = server.data;
 					//cout << fishImgProc.rotationAngleX << endl;

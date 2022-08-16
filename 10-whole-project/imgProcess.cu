@@ -655,7 +655,7 @@ void FishImageProcess::ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle
 
 
 
-void FishImageProcess::cropRotatedImage()
+void FishImageProcess::cropRotatedImage(int xbias,int ybias)
 {
 	if (DEBUG)
 	{
@@ -730,7 +730,7 @@ void FishImageProcess::cropRotatedImage()
 	thrust::device_ptr<float> dev_ptr(imageRotated2D_XY_GPU);
 	double imageRotated2D_XY_mean = thrust::reduce(dev_ptr, dev_ptr + size_t(200 * 200), (float)0, thrust::plus<float>()) / (200 * 200);
 
-	cout << "imageRotated2D_XY_mean: " << imageRotated2D_XY_mean << endl;
+	//cout << "imageRotated2D_XY_mean: " << imageRotated2D_XY_mean << endl;
 
 	
 	int threadNum_2 = 256;
@@ -765,22 +765,22 @@ void FishImageProcess::cropRotatedImage()
 	CentroID[1] = rect.tl().y;
 	CentroID[2] = 0;
 
-	cout << "CentroID[0]:" << CentroID[0] << "  CentroID[1]:" << CentroID[1] << " CentroID[2]:" << CentroID[2] << endl;
+	//cout << "CentroID[0]:" << CentroID[0] << "  CentroID[1]:" << CentroID[1] << " CentroID[2]:" << CentroID[2] << endl;
 
-	if (CentroID[0] + 95 > 200 || CentroID[1] + 76 > 200 || CentroID[0] - 10 < 0)
+	if (CentroID[0] + 95 > 200 || CentroID[1] + 76 > 200 || CentroID[0] - ybias < 0 || CentroID[1] - xbias < 0)
 	{
 		cout << "centroID error!!!" << endl;
 		return;
 	}
 
-	cropPoint = cv::Point3d(CentroID[0] - 10, CentroID[1], 0);
+	cropPoint = cv::Point3d(CentroID[0] - ybias, CentroID[1] - xbias, 0);
 
 
 	dim3 block_10(8, 8, 8);
 	dim3 grid_10((imgSizeAfterCrop_X + block_10.x - 1) / block_10.x, (imgSizeAfterCrop_Y + block_10.y - 1) / block_10.y, (imgSizeAfterCrop_Z + block_10.z - 1) / block_10.z);
 	//__global__ void kernel_10(float *imageRotated3D_gpu, float *ObjReconRed_gpu, int XObj, int YObj, int ZObj, int CentroID0, int CentroID2)
 	//kernel_10 << <grid_10, block_10 >> > (imageRotated3D_gpu, ObjCropRed_gpu, imgSizeAfterCrop_X, imgSizeAfterCrop_Y, imgSizeAfterCrop_Z, CentroID[0], CentroID[1]);
-	kernel_11 << <grid_10, block_10 >> > (imageRotated3D_gpu, ObjCropRed_gpu, imgSizeAfterCrop_X, imgSizeAfterCrop_Y, imgSizeAfterCrop_Z, CentroID[0] - 10, CentroID[1]);
+	kernel_11 << <grid_10, block_10 >> > (imageRotated3D_gpu, ObjCropRed_gpu, imgSizeAfterCrop_X, imgSizeAfterCrop_Y, imgSizeAfterCrop_Z, CentroID[0] - ybias, CentroID[1] - xbias);
 
 	cudaDeviceSynchronize();
 	checkGPUStatus(cudaGetLastError(), "kernel_10 Error");

@@ -125,7 +125,7 @@ public:
 	void matchingANDrotationXY();  //XY平面的模板匹配和旋转
 	void ObjRecon_imrotate3_gpu(float *ObjRecon_gpu, double nAngle, float *imageRotated3D_gpu);
 	//void matchingANDrotationYZ();  //YZ平面的模板匹配和旋转
-	void cropRotatedImage();   //200*200*50  crop成95*76*50
+	void cropRotatedImage(int xbias, int ybias);   //200*200*50  crop成95*76*50
 	void libtorchModelProcess();
 	std::vector<cv::Point2f> ZBB2FishTransform(cv::Rect roi);
 
