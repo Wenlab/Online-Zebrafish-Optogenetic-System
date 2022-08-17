@@ -419,8 +419,11 @@ void Experiment::initializeWriteOut()
 void Experiment::writeOutTxt()
 {
 	outTXT << "frameNum:" << frameNum << endl;
-	outTXT << "laserOn:" << params.laserOn << ", xsize:" << params.xsize << ", xpos:" << params.xpos
-		<< ", ysize:" << params.ysize << ", ypos:" << params.ypos << endl;
+	outTXT << "laserOn:" << params.laserOn << endl;
+	outTXT << "xsize:" << params.xsize << endl;
+	outTXT << "xpos:" << params.xpos << endl;
+	outTXT << "ysize:" << params.ysize << endl;
+	outTXT << "ypos:" << params.ypos << endl;
 	outTXT << "rotationAngleX:" << fishImgProc.rotationAngleX << endl;
 	outTXT << "rotationAngleY:" << fishImgProc.rotationAngleY << endl;
 	outTXT << "cropPoint:" << fishImgProc.cropPoint << endl;
