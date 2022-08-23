@@ -208,6 +208,9 @@ void Experiment::ImgReconAndRegis()
 	////结合rotation/crop/affine的数据做坐标转换
 	ROIpoints = fishImgProc.ZBB2FishTransform(roi);
 
+	generateGalvoVotages();
+
+
 	return;
 }
 
@@ -549,7 +552,6 @@ void Experiment::galvoControl()
 		bool read_inverse = false;
 		while (params.laserOn)
 		{
-			generateGalvoVotages();
 			if (read_inverse)
 			{
 				for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)
@@ -588,6 +590,7 @@ void Experiment::TCPconnect()
 		{
 			while (!UserWantToStop)
 			{
+				server.sendData();
 				int isOK = server.receive();
 				if (server.data >0&&server.data<=360)
 				{

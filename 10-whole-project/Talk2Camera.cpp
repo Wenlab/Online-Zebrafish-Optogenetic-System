@@ -405,9 +405,9 @@ int getUserSettings(int _handle){
 	//set trigger mode   
 	// hardware or software
 	int i_trigger;
-	cout << endl << "Enter trigger mode, 0 for hardware, 1 for software" << endl;
+	cout << endl << "Enter trigger mode, 1 for hardware, 0 or else for software" << endl;
 	cin >> i_trigger;
-	if (i_trigger == 0)
+	if (i_trigger == 1)
 	{
 		i_retCode= AT_SetEnumString(_handle,L"TriggerMode", L"External Exposure");
 	}
@@ -476,7 +476,7 @@ int getUserSettings(int _handle){
 
 
 	//if software trigger
-	if (i_trigger == 1)
+	if (i_trigger == 0)
 	{
 		//Set exposure time
 		cout << endl << "Enter the Exposure time in seconds, eg 0.009." << endl;

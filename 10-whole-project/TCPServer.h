@@ -24,6 +24,7 @@ public:
 
 	int receive();
 
+	void sendData();
 
 	void close();
 

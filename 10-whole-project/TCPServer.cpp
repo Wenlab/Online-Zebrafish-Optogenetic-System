@@ -93,6 +93,17 @@ int TCPServer::receive()
 }
 
 
+void TCPServer::sendData()
+{
+	char sendData[100];
+	std::string str = "aaaa";
+	memset(sendData, 0, 100);
+	memcpy(sendData, str.c_str(), sizeof(str));
+	//cout << "send message to client" << endl;
+	send(socketConn2, sendData, strlen(sendData), 0);
+
+}
+
 
 void TCPServer::close()
 {
