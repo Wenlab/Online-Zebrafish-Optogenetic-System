@@ -11,9 +11,13 @@
 
 #include"avir.h"
 
+#include<mutex>
+
 #include <opencv2/core/utils/logger.hpp>
 
 using namespace std;
+
+mutex m1, m2, m3, m4;
 
 Experiment::Experiment(std::string modle_path) :fishImgProc(modle_path)
 {
@@ -132,7 +136,7 @@ void Experiment::readFullSizeImgFromFile()
 		cout << "read img done: " << filename << endl;
 		frameNum = frameNum + 1;
 
-		if (frameNum >= beforeResizeImgNames.size()-1)
+		if (frameNum >= beforeResizeImgNames.size() - 1)
 		{
 			frameNum = 0;
 			//UserWantToStop = 1;
@@ -155,7 +159,7 @@ void Experiment::readFullSizeImgFromCamera()
 	{
 		if (T2Cam_GrabFrame(cam_data, cam_handle) == 0)
 		{
-			memcpy(Image, cam_data->ImageRawData, CCDSIZEX *CCDSIZEY * sizeof(unsigned short));
+			memcpy(Image, cam_data->ImageRawData, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
 		}
 		else
 		{
@@ -165,7 +169,11 @@ void Experiment::readFullSizeImgFromCamera()
 
 		preProcessImg();
 		resizeImg();
+		memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
 		frameNum = frameNum + 1;
+
+
+		//cout << frameNum << endl;
 	}
 
 	AT_Command(cam_handle, L"AcquisitionStop");
@@ -187,6 +195,7 @@ void Experiment::preProcessImg()
 void Experiment::resizeImg()
 {
 	avir::CImageResizer<> ImageResizer(16);
+
 	ImageResizer.resizeImage(Image, 2048, 2048, 0, Image4bin, 512, 512, 1, 0);
 
 	return;
@@ -196,19 +205,21 @@ void Experiment::resizeImg()
 
 void Experiment::ImgReconAndRegis()
 {
+	m3.lock();
 	fishImgProc.loadImage(Image4bin);
+	m3.unlock();
+
 	fishImgProc.reconImage();//重构读进来的图像
 	fishImgProc.cropReconImage();
-	//rotation
+	////rotation
 	fishImgProc.matchingANDrotationXY();
-	//crop
+	////crop
 	fishImgProc.cropRotatedImage(params.xbias, params.ybias);
-	////crop的结果构建movingTensor，和fixTensor一起送入网络处理
+	//////crop的结果构建movingTensor，和fixTensor一起送入网络处理
 	fishImgProc.libtorchModelProcess();
-	////结合rotation/crop/affine的数据做坐标转换
+	//////结合rotation/crop/affine的数据做坐标转换
 	ROIpoints = fishImgProc.ZBB2FishTransform(roi);
 
-	generateGalvoVotages();
 
 
 	return;
@@ -281,7 +292,7 @@ void Experiment::setupGUI()
 	cv::createTrackbar("ybias", "Control Panel for Optogenetic", &params.ybias, 20);
 
 	cv::createTrackbar("Stop", "Control Panel for Optogenetic", &UserWantToStop, 1);
-	
+
 	cv::waitKey(1);
 	return;
 }
@@ -348,7 +359,7 @@ void Experiment::drawGUIimg()
 		//逐条边绘制
 		for (int j = 0; j < 4; j++)
 		{
-			cv::line(MIP_8u, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255),2);
+			cv::line(MIP_8u, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255), 2);
 		}
 	}
 	//for (int i = 0; i < ROIpoints.size(); i++)
@@ -413,7 +424,7 @@ void Experiment::initializeWriteOut()
 		_mkdir(cropfolderName.c_str());
 	}
 
-	txtName = path + fishName + "/"+ fishName +".txt";
+	txtName = path + fishName + "/" + fishName + ".txt";
 	outTXT.open(txtName);
 
 	return;
@@ -450,14 +461,17 @@ void Experiment::writeOutData()
 		{
 			if (frameCount_writeOut != frameNum)
 			{
-				//saveImg2Disk(folderName + "/" + int2string(6, frameNum) + ".tif");
+				m1.lock();
 				saveAndCheckImage(Image, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
 				cudaMemcpy(cropResult_cpu, fishImgProc.ObjCropRed_gpu, sizeof(float) * 76 * 95 * 50, cudaMemcpyDeviceToHost);
 				saveAndCheckImage(cropResult_cpu, 76, 95, 50, cropfolderName + "/" + int2string(6, frameNum) + ".tif");
 				writeOutTxt();
 				frameCount_writeOut = frameNum;
+				m1.unlock();
 			}
 		}
+
+
 	}
 
 	cout << "write out thread say goodbye!!" << endl;
@@ -476,7 +490,7 @@ void Experiment::imgProcess()
 		{
 			//time.start();
 			ImgReconAndRegis();
-			
+
 			getReconMIP();
 			frameCount_imgprocess = frameNum;
 			cout << " ";   //这里必须有一句输出？？？
@@ -517,8 +531,6 @@ void Experiment::controlExp()
 
 			}
 		}
-
-		//cv::waitKey(1);
 	}
 
 	cout << "control thread say goodbye" << endl;
@@ -528,19 +540,26 @@ void Experiment::controlExp()
 
 void Experiment::generateGalvoVotages()
 {
+	//m4.lock();
 	bool inverse = false;
 	cv::Point p(0, 0);
 	//continue read pixel coordinates
 	galvoVotagesPairs.clear();
-	for (int i = 0; i < ROIpoints.size(); i++)
+	for (int i = 0; i < ROIpoints.size(); i=i+2)
 	{
+		if (ROIpoints[i].x < 0 || ROIpoints[i].y < 0)
+		{
+			break;
+		}
 		cv::Point p = cv::Point(ROIpoints[i].x, ROIpoints[i].y);
 		float* Xdata = galvoMatrixX.ptr<float>(p.x);
 		float galvo_x = Xdata[p.y];
 		float* Ydata = galvoMatrixY.ptr<float>(p.x);
 		float galvo_y = Ydata[p.y];
 		galvoVotagesPairs.push_back(cv::Point2f(galvo_x, galvo_y));
+		
 	}
+	//m4.unlock();
 }
 
 void Experiment::galvoControl()
@@ -548,7 +567,7 @@ void Experiment::galvoControl()
 	cout << "I'm galvo thread." << endl;
 	while (!UserWantToStop)
 	{
-		
+
 		bool read_inverse = false;
 		while (params.laserOn)
 		{
@@ -570,6 +589,8 @@ void Experiment::galvoControl()
 				read_inverse = true;
 			}
 		}
+
+		//cout << "bbb" << endl;
 		galvo.spinGalvo(cv::Point(-5, -5));   //放在一个很偏的点
 	}
 
@@ -592,7 +613,7 @@ void Experiment::TCPconnect()
 			{
 				server.sendData();
 				int isOK = server.receive();
-				if (server.data >0&&server.data<=360)
+				if (server.data > 0 && server.data <= 360)
 				{
 					fishImgProc.rotationAngleX = server.data;
 					//cout << fishImgProc.rotationAngleX << endl;
@@ -609,6 +630,7 @@ void Experiment::TCPconnect()
 				}
 			}
 		}
+		cout << "ccc" << endl;
 	}
 
 	server.close();
@@ -616,6 +638,17 @@ void Experiment::TCPconnect()
 	return;
 }
 
+
+void Experiment::generateGalvoVoltagesPairs()
+{
+	while (!UserWantToStop)
+	{
+		generateGalvoVotages();
+		Sleep(1);
+	}
+
+	return;
+}
 
 
 void Experiment::clear()
@@ -650,5 +683,3 @@ void Experiment::exit()
 	exit();
 	return;
 }
-
-

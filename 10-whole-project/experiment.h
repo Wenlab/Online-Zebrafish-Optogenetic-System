@@ -94,7 +94,7 @@ public:
 
 	void initializeWriteOut();
 	void writeOutTxt();
-	
+
 	void controlExp();
 
 	void generateGalvoVotages();
@@ -110,6 +110,7 @@ public:
 	void imgProcess();
 	void galvoControl();
 	void TCPconnect();
+	void generateGalvoVoltagesPairs();
 	void readFullSizeImgFromFile();
 	void readFullSizeImgFromCamera();
 
@@ -118,5 +119,3 @@ public:
 private:
 
 };
-
-

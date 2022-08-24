@@ -665,57 +665,7 @@ void FishImageProcess::cropRotatedImage(int xbias,int ybias)
 	thrust::device_ptr<float> dev_ptr2(imageRotated3D_gpu);
 	double imageRotated3D_x_mean = thrust::reduce(dev_ptr2, dev_ptr2 + size_t(ObjRecon_size), (float)0, thrust::plus<float>()) / (ObjRecon_size)+4;
 
-	check(cudaMemcpy(cpuObjRotation_crop, imageRotated3D_gpu, sizeof(float)*ObjRecon_size, cudaMemcpyDeviceToHost), "ObjRecon cudaMemcpy Error");
-
-	////crop
-	//int *idx_2 = new int[ObjRecon_size]();//imageRotated3D_x大于均值的索引
-	//int idx_2_size = 0;
-	//for (int i = 0; i < ObjRecon_size; i++)
-	//{
-	//	if (cpuObjRotation_crop[i] > imageRotated3D_x_mean)
-	//	{
-	//		idx_2_size++;
-	//		idx_2[idx_2_size] = i;
-	//	}
-	//}
-	////idx_2数组的每一个数字转换成imageRotated3D_x（200行*200列*50波段）的行号，列号，波段号
-	//float *x = new float[idx_2_size]; float x_sum = 0;
-	//float *y = new float[idx_2_size]; float y_sum = 0;
-	//float *z = new float[idx_2_size]; float z_sum = 0;
-	//for (int i = 0; i < idx_2_size; i++)
-	//{
-	//	z[i] = idx_2[i] / (200 * 200);
-	//	int yushu = idx_2[i] % (200 * 200);
-	//	x[i] = yushu / 200;
-	//	y[i] = yushu % 200;
-
-	//	x_sum += x[i];
-	//	y_sum += y[i];
-	//	z_sum += z[i];
-	//}
-	//int CentroID[3];
-	//CentroID[0] = int(x_sum / idx_2_size + 0.5);
-	//CentroID[1] = int(y_sum / idx_2_size + 0.5);
-	//CentroID[2] = int(z_sum / idx_2_size + 0.5);
-	//if (DEBUG)
-	//{
-	//	cout << "CentroID: " << CentroID[0] << "   " << CentroID[1] << "  " << CentroID[2] << endl;
-	//}
-	////CentroID数组在matlab中是[89,91,24]，我计算的是[86,91,24],x相差3，是npp旋转和matlab的结果有误差造成的，误差也不大，算正常！！
-
-	//// 保留质心坐标周围的区域，坐标索引在matlab的数上要减去1
-	//// 行范围：【CentroID(0)-61：CentroID(0)+33】 。列范围：【CentroID(2)-38：CentroID(2)+37】。所有的波段
-	////int XObj = CentroID[0] + 33 - (CentroID[0] - 61) + 1;//行
-	////int	YObj = CentroID[2] + 37 - (CentroID[2] - 38) + 1;//列
-	////int	ZObj = 50;//波段
-
-	//if (CentroID[0] < 61 || CentroID[1] < 38 || CentroID[0]>167 || CentroID[1]>163)
-	//{
-	//	cout << "centroID error!!!" << endl;
-	//	return;
-	//}
-
-	//cropPoint = cv::Point3d(CentroID[0] - 61, CentroID[1] - 38, 0);
+	//check(cudaMemcpy(cpuObjRotation_crop, imageRotated3D_gpu, sizeof(float)*ObjRecon_size, cudaMemcpyDeviceToHost), "ObjRecon cudaMemcpy Error");
 
 
 
@@ -728,7 +678,7 @@ void FishImageProcess::cropRotatedImage(int xbias,int ybias)
 	checkGPUStatus(cudaGetLastError(), "kernel_1 Error");
 
 	thrust::device_ptr<float> dev_ptr(imageRotated2D_XY_GPU);
-	double imageRotated2D_XY_mean = thrust::reduce(dev_ptr, dev_ptr + size_t(200 * 200), (float)0, thrust::plus<float>()) / (200 * 200);
+	double imageRotated2D_XY_mean = thrust::reduce(dev_ptr, dev_ptr + size_t(200 * 200), (float)0, thrust::plus<float>()) / (200 * 200) - 5;  //阈值太高导致截不全
 
 	//cout << "imageRotated2D_XY_mean: " << imageRotated2D_XY_mean << endl;
 
@@ -770,6 +720,9 @@ void FishImageProcess::cropRotatedImage(int xbias,int ybias)
 	if (CentroID[0] + 95 > 200 || CentroID[1] + 76 > 200 || CentroID[0] - ybias < 0 || CentroID[1] - xbias < 0)
 	{
 		cout << "centroID error!!!" << endl;
+		//CentroID[0] = 0;
+		//CentroID[1] = 0;
+		//CentroID[2] = 0;
 		return;
 	}
 

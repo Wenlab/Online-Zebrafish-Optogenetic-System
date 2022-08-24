@@ -41,8 +41,8 @@ bool GalvoData::initialize()
 	}
 
 
-	error = DAQmxCreateAOVoltageChan(taskHandle1, "Dev3/ao0", "", -10.0, 10.0, DAQmx_Val_Volts, "");
-	error = DAQmxCreateAOVoltageChan(taskHandle2, "Dev3/ao1", "", -10.0, 10.0, DAQmx_Val_Volts, "");
+	error = DAQmxCreateAOVoltageChan(taskHandle1, "Dev3/ao0", "", -5.0, 5.0, DAQmx_Val_Volts, "");
+	error = DAQmxCreateAOVoltageChan(taskHandle2, "Dev3/ao1", "", -5.0, 5.0, DAQmx_Val_Volts, "");
 
 	if (error != 0)
 	{
@@ -52,7 +52,9 @@ bool GalvoData::initialize()
 		return false;
 	}
 
-	error = DAQmxCfgSampClkTiming(taskHandle1, "", 50000, DAQmx_Val_Rising, DAQmx_Val_ContSamps,8000);
+
+	//第一个值尽量大，第二个值尽量小
+	error = DAQmxCfgSampClkTiming(taskHandle1, "", 1000000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 50);
 	//error = DAQmxCfgSampClkTiming(taskHandle2, "", 50000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 5000);
 
 	if (error != 0)
