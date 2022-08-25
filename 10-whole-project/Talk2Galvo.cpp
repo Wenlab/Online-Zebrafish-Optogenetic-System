@@ -54,7 +54,7 @@ bool GalvoData::initialize()
 
 
 	//第一个值尽量大，第二个值尽量小
-	error = DAQmxCfgSampClkTiming(taskHandle1, "", 1000000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 50);
+	error = DAQmxCfgSampClkTiming(taskHandle1, "", 100000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 5000);
 	//error = DAQmxCfgSampClkTiming(taskHandle2, "", 50000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 5000);
 
 	if (error != 0)

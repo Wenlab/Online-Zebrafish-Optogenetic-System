@@ -132,6 +132,7 @@ void Experiment::readFullSizeImgFromFile()
 		//delete poDataset;
 
 		resizeImg();
+		memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
 
 		cout << "read img done: " << filename << endl;
 		frameNum = frameNum + 1;
@@ -169,7 +170,12 @@ void Experiment::readFullSizeImgFromCamera()
 
 		preProcessImg();
 		resizeImg();
-		memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
+
+		if (recordOn)
+		{
+			memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
+			saveAndCheckImage(Image_forSave, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
+		}
 		frameNum = frameNum + 1;
 
 
@@ -186,7 +192,7 @@ void Experiment::preProcessImg()
 {
 	cv::Mat temp(cv::Size(CCDSIZEX, CCDSIZEY), CV_16UC1, Image);
 	cv::flip(temp, temp, 0);   //flipcode=0,垂直翻转图像
-	cv::threshold(temp, temp, thre, maxValue, CV_THRESH_TRUNC);   //高于thre的数据被置为thre
+	//cv::threshold(temp, temp, thre, maxValue, CV_THRESH_TRUNC);   //高于thre的数据被置为thre
 
 	return;
 }
@@ -220,54 +226,25 @@ void Experiment::ImgReconAndRegis()
 	//////结合rotation/crop/affine的数据做坐标转换
 	ROIpoints = fishImgProc.ZBB2FishTransform(roi);
 
+	generateGalvoVotages();
 
 
 	return;
 }
 
-//
-////改成可存储任意大小的图像
-//void Experiment::saveImg2Disk(string filename)
-//{
-//	memcpy(Image_forSave, Image, CCDSIZEX *CCDSIZEY * sizeof(unsigned short));
-//	//输出图像
-//	GDALDriver * pDriver = GetGDALDriverManager()->GetDriverByName("GTiff");
-//	GDALDataset *ds = pDriver->Create(filename.c_str(), 2048, 2048, 1, GDT_UInt16, NULL);
-//	if (ds == NULL)
-//	{
-//		cout << "Failed to create output file!" << endl;
-//		system("pause");
-//		return;
-//	}
-//	unsigned short int *writeOut_buffer = new unsigned short int[2048];
-//	for (int band = 0; band < 1; band++)
-//	{
-//		for (int i = 0; i < 2048; i++)//行循环
-//		{
-//			for (int j = 0; j < 2048; j++)//列循环
-//			{
-//				writeOut_buffer[j] = Image_forSave[band * 2048 * 2048 + i * 2048 + j];
-//			}
-//			ds->GetRasterBand(band + 1)->RasterIO(GF_Write, 0, i, 2048, 1, writeOut_buffer, 2048, 1, GDT_UInt16, 0, 0);
-//		}
-//		//cout << band << endl;
-//	}
-//	delete[] writeOut_buffer;
-//	//delete ds;
-//	//delete pDriver;
-//
-//	return;
-//}
+
 
 void Experiment::getReconMIP()
 {
 	cudaMemcpy(mip_cpu, fishImgProc.image2D_XY_gpu, sizeof(float) * 200 * 200 * 1, cudaMemcpyDeviceToHost);
-	//MIP = cv::Mat(200, 200, CV_32FC1, mip_cpu);//重复创建mat导致内存泄露,画出来的MIP是正确的
-	//float val = MIP.at<float>(100, 100);
-	//cout << val << endl;
+	
+	//cv::Mat mip500, mip5000;
+	//cv::threshold(MIP, mip500, 1000, maxValue, CV_THRESH_TOZERO_INV);   //高于thre的数据被置为0
+	//cv::threshold(MIP, mip5000, 5000, maxValue, CV_THRESH_TOZERO);   //低于thre的数据被置为0
+	//cv::threshold(mip5000, mip5000, 1000, maxValue, CV_THRESH_TRUNC);   //高于thre的数据被置为THRE
 
-	//MIP.data = (uchar*)mip_cpu;   //用这个方法赋值，内存不再泄露,但是画出来的MIP全是黑的
-	//memcpy(MIP.ptr<float>(0), mip_cpu, sizeof(float) * 200 * 200 * 1); //用这个方法赋值，内存不再泄露,但是画出来的MIP全是黑的
+	cv::threshold(MIP, MIP, 10000, maxValue, CV_THRESH_TRUNC);
+	//MIP = mip500 + mip5000;
 
 	cv::normalize(MIP, MIP, 0, 1, cv::NormTypes::NORM_MINMAX);
 
@@ -336,7 +313,7 @@ void Experiment::drawGUIimg()
 
 	//准备reference图像，ZBB
 	cv::Mat ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
-	cv::rectangle(ref, roi, cv::Scalar(255), 2);
+	cv::rectangle(ref, roi, cv::Scalar(255), 1);
 	cv::resize(ref, ref_resize, cv::Size(ref.cols * 2, ref.rows * 2));
 	cv::Mat refROI = ref_MIP(cv::Rect(0, 0, ref_resize.cols, ref_resize.rows));
 	ref_resize.copyTo(refROI);
@@ -359,7 +336,7 @@ void Experiment::drawGUIimg()
 		//逐条边绘制
 		for (int j = 0; j < 4; j++)
 		{
-			cv::line(MIP_8u, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255), 2);
+			cv::line(MIP_8u, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255), 1);
 		}
 	}
 	//for (int i = 0; i < ROIpoints.size(); i++)
@@ -373,7 +350,7 @@ void Experiment::drawGUIimg()
 	MIP_8u.copyTo(MIPROI);
 
 
-	cv::Mat ref_mip_resize;
+	//cv::Mat ref_mip_resize;
 	cv::resize(ref_MIP, ref_mip_resize, cv::Size(ref_MIP.cols * 2, ref_MIP.rows * 2));
 
 	cv::imshow("test", ref_mip_resize);
@@ -410,6 +387,12 @@ void Experiment::initializeWriteOut()
 	{
 		_mkdir(folderName.c_str());
 	}
+
+	MIPWriter.open(folderName+"referenceMIP.avi", CV_FOURCC('M', 'J', 'P', 'G'),
+		10, 
+		cv::Size(800, 400),
+		false);
+
 
 	rawfolderName = folderName + "/raw/";
 	cropfolderName = folderName + "/crop/";
@@ -462,17 +445,19 @@ void Experiment::writeOutData()
 			if (frameCount_writeOut != frameNum)
 			{
 				m1.lock();
-				saveAndCheckImage(Image, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
 				cudaMemcpy(cropResult_cpu, fishImgProc.ObjCropRed_gpu, sizeof(float) * 76 * 95 * 50, cudaMemcpyDeviceToHost);
 				saveAndCheckImage(cropResult_cpu, 76, 95, 50, cropfolderName + "/" + int2string(6, frameNum) + ".tif");
 				writeOutTxt();
 				frameCount_writeOut = frameNum;
+				MIPWriter.write(ref_mip_resize);
 				m1.unlock();
 			}
 		}
 
 
 	}
+	MIPWriter.release();
+	outTXT.close();
 
 	cout << "write out thread say goodbye!!" << endl;
 	return;
@@ -571,6 +556,7 @@ void Experiment::galvoControl()
 		bool read_inverse = false;
 		while (params.laserOn)
 		{
+
 			if (read_inverse)
 			{
 				for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)

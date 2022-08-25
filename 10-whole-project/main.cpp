@@ -36,7 +36,7 @@ int main()
 	thread imgProcessLoopThread(&Experiment::imgProcess, &myExp);
 	thread writeOutLoopThread(&Experiment::writeOutData, &myExp);
 	thread TCPconnectLoopThread(&Experiment::TCPconnect, &myExp);
-	thread generateGalvoVoltagesPairs(&Experiment::generateGalvoVoltagesPairs, &myExp);
+	//thread generateGalvoVoltagesPairs(&Experiment::generateGalvoVoltagesPairs, &myExp);
 
 
 
@@ -48,7 +48,7 @@ int main()
 	imgProcessLoopThread.join();
 	writeOutLoopThread.join();
 	TCPconnectLoopThread.join();
-	generateGalvoVoltagesPairs.join();
+	//generateGalvoVoltagesPairs.join();
 
 	myExp.clear();
 

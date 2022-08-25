@@ -37,6 +37,9 @@ public:
 	float* mip_cpu;
 	float* cropResult_cpu;
 
+	cv::Mat ref_mip_resize;
+	cv::VideoWriter MIPWriter;
+
 	//cameras
 	AT_H cam_handle; //相机句柄变量的声明,随后将再初始化时为其赋值,之后用它来传递相机信息
 	CamData* cam_data;
