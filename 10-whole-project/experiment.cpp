@@ -154,6 +154,8 @@ void Experiment::readFullSizeImgFromFile()
 
 void Experiment::readFullSizeImgFromCamera()
 {
+	Timer testSave;
+
 	//Start Acquisition
 	T2Cam_StartAcquisition(cam_handle);
 	while (!UserWantToStop)
@@ -171,11 +173,14 @@ void Experiment::readFullSizeImgFromCamera()
 		preProcessImg();
 		resizeImg();
 
-		if (recordOn)
-		{
-			memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
-			saveAndCheckImage(Image_forSave, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
-		}
+		//if (recordOn)
+		//{
+		//	//testSave.start();
+		//	memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
+		//	saveAndCheckImage(Image_forSave, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
+		//	//testSave.stop();
+		//	//cout << "save raw image time: " << testSave.getElapsedTimeInMilliSec() << endl;
+		//}
 		frameNum = frameNum + 1;
 
 
@@ -211,9 +216,7 @@ void Experiment::resizeImg()
 
 void Experiment::ImgReconAndRegis()
 {
-	m3.lock();
 	fishImgProc.loadImage(Image4bin);
-	m3.unlock();
 
 	fishImgProc.reconImage();//重构读进来的图像
 	fishImgProc.cropReconImage();
@@ -437,6 +440,11 @@ void Experiment::writeOutData()
 {
 	cout << "write out thread say hello :p" << endl;
 
+	//Timer time;
+	//string TimetxtName = "E:/online-opto-data/testSave.txt";
+	//std::ofstream testSavetxt(TimetxtName);
+
+
 	int frameCount_writeOut = 0;
 	while (!UserWantToStop)
 	{
@@ -444,18 +452,27 @@ void Experiment::writeOutData()
 		{
 			if (frameCount_writeOut != frameNum)
 			{
-				m1.lock();
-				cudaMemcpy(cropResult_cpu, fishImgProc.ObjCropRed_gpu, sizeof(float) * 76 * 95 * 50, cudaMemcpyDeviceToHost);
-				saveAndCheckImage(cropResult_cpu, 76, 95, 50, cropfolderName + "/" + int2string(6, frameNum) + ".tif");
-				writeOutTxt();
+				//time.start();
+
+				memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
+				saveAndCheckImage(Image_forSave, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
+
+				cudaMemcpy(cropResult_cpu, fishImgProc.ObjCropRed_gpu, sizeof(float) * 76 * 95 * 50, cudaMemcpyDeviceToHost);   //1
+				saveAndCheckImage(cropResult_cpu, 76, 95, 50, cropfolderName + "/" + int2string(6, frameNum) + ".tif");    //2
+				writeOutTxt();   //3
+				MIPWriter.write(ref_mip_resize);  //4
 				frameCount_writeOut = frameNum;
-				MIPWriter.write(ref_mip_resize);
-				m1.unlock();
+				
+
+				//time.stop();
+				//cout << time.getElapsedTimeInMilliSec() << endl;
+				//cout << "save time: " << time.getElapsedTimeInMilliSec() << endl;
 			}
 		}
 
 
 	}
+	//testSavetxt.close();
 	MIPWriter.release();
 	outTXT.close();
 
@@ -525,7 +542,6 @@ void Experiment::controlExp()
 
 void Experiment::generateGalvoVotages()
 {
-	//m4.lock();
 	bool inverse = false;
 	cv::Point p(0, 0);
 	//continue read pixel coordinates
@@ -544,7 +560,6 @@ void Experiment::generateGalvoVotages()
 		galvoVotagesPairs.push_back(cv::Point2f(galvo_x, galvo_y));
 		
 	}
-	//m4.unlock();
 }
 
 void Experiment::galvoControl()

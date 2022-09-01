@@ -524,7 +524,7 @@ void FishImageProcess::cropReconImage()
 			{
 				float t = 0;
 				t = cpuObjRecon[band*PSF_size_1*PSF_size_2 + (i + line_start)*PSF_size_2 + j + col_start];
-				if (t > 400 && t < 8000)
+				if (t > 1800 && t < 8000)
 					t = 0;
 				//cpuObjRecon_crop[band * 200 * 200 + i * 200 + j] = cpuObjRecon[band*PSF_size_1*PSF_size_2 + (i + line_start)*PSF_size_2 + j + col_start];
 				cpuObjRecon_crop[band * 200 * 200 + i * 200 + j] = t;
@@ -719,6 +719,9 @@ void FishImageProcess::cropRotatedImage(int xbias,int ybias)
 	CentroID[0] = rect.tl().x;
 	CentroID[1] = rect.tl().y;
 	CentroID[2] = 0;
+	//CentroID[0] = 100;
+	//CentroID[1] = 100;
+	//CentroID[2] = 0;
 
 	//cout << "CentroID[0]:" << CentroID[0] << "  CentroID[1]:" << CentroID[1] << " CentroID[2]:" << CentroID[2] << endl;
 
