@@ -328,7 +328,17 @@ void Experiment::drawGUIimg()
 
 	//准备reference图像，ZBB
 	cv::Mat ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
-	cv::rectangle(ref, roi, cv::Scalar(255), 1);
+	//即使选中的区域很小，在MIP上也能被画出来
+	cv::Rect r = roi;
+	if (r.width < 10)
+	{
+		r.width = r.width + 2;
+	}
+	if (r.height < 10)
+	{
+		r.height = r.height + 2;
+	}
+	cv::rectangle(ref, r, cv::Scalar(255), 1);
 	cv::resize(ref, ref_resize, cv::Size(ref.cols * 2, ref.rows * 2));
 	cv::Mat refROI = ref_MIP(cv::Rect(0, 0, ref_resize.cols, ref_resize.rows));
 	ref_resize.copyTo(refROI);
@@ -344,6 +354,15 @@ void Experiment::drawGUIimg()
 	if (ROIpoints.size() > 3)
 	{
 		cv::RotatedRect re = cv::minAreaRect(ROIpoints);
+		//即使选中的区域很小，在MIP上也能被画出来
+		if (re.size.height < 10)
+		{
+			re.size.height = re.size.height + 2;
+		}
+		if (re.size.width < 10)
+		{
+			re.size.width = re.size.width + 2;   
+		}
 		//获取旋转矩形的四个顶点
 		cv::Point2f* vertices = new cv::Point2f[4];
 		re.points(vertices);
