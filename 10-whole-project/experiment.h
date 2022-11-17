@@ -22,8 +22,13 @@ struct OptogeneticParams
 	int ypos = 10;
 	int xbias = 5;  //按照threshold，选取鱼的包围矩形，包围矩形左上点与选取点的bias
 	int ybias = 5;
-	int laserTime = 2000;
+	int laserTime = 1500;
 	int laserOn = 0;
+	int laserOnLongTime = 0;
+	int interval = 30;   // 给光间隔  单位是s
+	int circleNum = 30;  //给多少个周期
+	int circleOn = 0;   //是否周期性给光
+
 };
 
 class Experiment
@@ -47,6 +52,7 @@ public:
 
 
 	OptogeneticParams params;
+	int circleCount;
 	int recordOn;
 	int UserWantToStop;
 

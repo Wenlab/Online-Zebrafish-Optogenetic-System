@@ -524,7 +524,7 @@ void FishImageProcess::cropReconImage()
 			{
 				float t = 0;
 				t = cpuObjRecon[band*PSF_size_1*PSF_size_2 + (i + line_start)*PSF_size_2 + j + col_start];
-				if (t > 1800 && t < 8000)
+				if (t > 2000)
 					t = 0;
 				//cpuObjRecon_crop[band * 200 * 200 + i * 200 + j] = cpuObjRecon[band*PSF_size_1*PSF_size_2 + (i + line_start)*PSF_size_2 + j + col_start];
 				cpuObjRecon_crop[band * 200 * 200 + i * 200 + j] = t;

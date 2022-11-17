@@ -30,7 +30,6 @@ bool GalvoData::initialize()
 	int error = 0;
 
 	error = DAQmxCreateTask("", &taskHandle1);
-	error = DAQmxCreateTask("", &taskHandle2);
 
 	if (error != 0) 
 	{
@@ -41,8 +40,7 @@ bool GalvoData::initialize()
 	}
 
 
-	error = DAQmxCreateAOVoltageChan(taskHandle1, "Dev3/ao0", "", -5.0, 5.0, DAQmx_Val_Volts, "");
-	error = DAQmxCreateAOVoltageChan(taskHandle2, "Dev3/ao1", "", -5.0, 5.0, DAQmx_Val_Volts, "");
+	error = DAQmxCreateAOVoltageChan(taskHandle1, "Dev3/ao0:1", "", -5.0, 5.0, DAQmx_Val_Volts, "");
 
 	if (error != 0)
 	{
@@ -54,8 +52,7 @@ bool GalvoData::initialize()
 
 
 	//第一个值尽量大，第二个值尽量小
-	error = DAQmxCfgSampClkTiming(taskHandle1, "", 100000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 5000);
-	//error = DAQmxCfgSampClkTiming(taskHandle2, "", 50000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 5000);
+	error = DAQmxCfgSampClkTiming(taskHandle1, "", 50000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 5000);
 
 	if (error != 0)
 	{
@@ -66,7 +63,6 @@ bool GalvoData::initialize()
 	}
 
 	error = DAQmxStartTask(taskHandle1);
-	error = DAQmxStartTask(taskHandle2);
 	if (error != 0)
 	{
 		handleDAQError(error);
@@ -83,14 +79,12 @@ int GalvoData::spinGalvo(cv::Point2f pt)
 	int32 written;
 	int	error = 0;
 
-	double data1;
-	double data2;
 
-	data1 = pt.x;
-	data2 = pt.y;
+	double data[2];
+	data[0] = pt.x;
+	data[1] = pt.y;
 
-	error = DAQmxWriteAnalogF64(taskHandle1, 1, 0, 10.0, DAQmx_Val_GroupByChannel, &data1, &written, NULL);
-	error = DAQmxWriteAnalogF64(taskHandle2, 1, 0, 10.0, DAQmx_Val_GroupByChannel, &data2, &written, NULL);
+	error = DAQmxWriteAnalogF64(taskHandle1, 1, 0, 10.0, DAQmx_Val_GroupByChannel, data, &written, NULL);
 
 	if (error != 0) 
 	{

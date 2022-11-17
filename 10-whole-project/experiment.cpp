@@ -77,6 +77,7 @@ void Experiment::initialize()
 
 	frameNum = 0;
 	recordOn = 0;
+	circleCount = 0;
 	UserWantToStop = 0;
 
 	return;
@@ -86,7 +87,7 @@ void Experiment::readFullSizeImgFromFile()
 {
 	cout << "read Image thread say hello!!" << endl;
 
-	string beforeResizeImgPath = "D:/kexin/Online-Zebrafish-Optogenetic/data/r20210824_X10";
+	string beforeResizeImgPath = "D:/online-opto-data/20221016_1556_g8s-lssm-chriR_8dpf/raw";
 	vector<string> beforeResizeImgNames;
 	getFileNames(beforeResizeImgPath, beforeResizeImgNames);
 
@@ -134,7 +135,7 @@ void Experiment::readFullSizeImgFromFile()
 		resizeImg();
 		memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
 
-		cout << "read img done: " << filename << endl;
+		//cout << "read img done: " << filename << endl;
 		frameNum = frameNum + 1;
 
 		if (frameNum >= beforeResizeImgNames.size() - 1)
@@ -231,6 +232,7 @@ void Experiment::ImgReconAndRegis()
 
 	generateGalvoVotages();
 
+	cv::waitKey(100);
 
 	return;
 }
@@ -259,13 +261,18 @@ void Experiment::setupGUI()
 	//set up GUI
 	cout << "creating control panel for optogenetic..." << endl;
 	cv::namedWindow("Control Panel for Optogenetic", cv::WINDOW_NORMAL);
-	cv::resizeWindow("Control Panel for Optogenetic", 700, 500);
+	cv::resizeWindow("Control Panel for Optogenetic", 700, 700);
 
 	cv::createTrackbar("recordOn", "Control Panel for Optogenetic", &recordOn, 1);
+	cv::createTrackbar("LaserLong", "Control Panel for Optogenetic", &params.laserOnLongTime, 1);
 	cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
-	cv::createTrackbar("ScanTime", "Control Panel for Optogenetic", &params.laserTime, 5000);
-	cv::createTrackbar("xsize", "Control Panel for Optogenetic", &params.xsize, 20);
-	cv::createTrackbar("ysize", "Control Panel for Optogenetic", &params.ysize, 20);
+	cv::createTrackbar("Interval", "Control Panel for Optogenetic", &params.interval, 60);  //给光间隔时长
+	cv::createTrackbar("ScanTime", "Control Panel for Optogenetic", &params.laserTime, 5000);  //给光时长
+	cv::createTrackbar("circleNum", "Control Panel for Optogenetic", &params.circleNum, 100);  //周期数量 
+	cv::createTrackbar("circleOn", "Control Panel for Optogenetic", &params.circleOn, 1);   //开始周期
+
+	cv::createTrackbar("xsize", "Control Panel for Optogenetic", &params.xsize, 50);
+	cv::createTrackbar("ysize", "Control Panel for Optogenetic", &params.ysize, 50);
 	cv::createTrackbar("xpos", "Control Panel for Optogenetic", &params.xpos, 76);
 	cv::createTrackbar("ypos", "Control Panel for Optogenetic", &params.ypos, 95);
 	cv::createTrackbar("xbias", "Control Panel for Optogenetic", &params.xbias, 20);
@@ -284,8 +291,13 @@ void Experiment::getParamsFromGUI()
 	//cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
 	//get params from GUI
 	recordOn = cv::getTrackbarPos("recordOn", "Control Panel for Optogenetic");
+	params.laserOnLongTime = cv::getTrackbarPos("LaserLong", "Control Panel for Optogenetic");
 	params.laserOn = cv::getTrackbarPos("LaserOn", "Control Panel for Optogenetic");
+	params.interval=cv::getTrackbarPos("Interval", "Control Panel for Optogenetic");
 	params.laserTime = cv::getTrackbarPos("ScanTime", "Control Panel for Optogenetic");
+	params.circleNum=cv::getTrackbarPos("circleNum", "Control Panel for Optogenetic");
+	params.circleOn=cv::getTrackbarPos("circleOn", "Control Panel for Optogenetic");
+
 	params.xsize = cv::getTrackbarPos("xsize", "Control Panel for Optogenetic");
 	params.ysize = cv::getTrackbarPos("ysize", "Control Panel for Optogenetic");
 	params.xpos = cv::getTrackbarPos("xpos", "Control Panel for Optogenetic");
@@ -419,7 +431,14 @@ void Experiment::initializeWriteOut()
 void Experiment::writeOutTxt()
 {
 	outTXT << "frameNum:" << frameNum << endl;
-	outTXT << "laserOn:" << params.laserOn << endl;
+	if (params.laserOnLongTime)
+	{
+		outTXT << "laserOn:" << params.laserOnLongTime << endl;
+	}
+	else
+	{
+		outTXT << "laserOn:" << params.laserOn << endl;
+	}
 	outTXT << "xsize:" << params.xsize << endl;
 	outTXT << "xpos:" << params.xpos << endl;
 	outTXT << "ysize:" << params.ysize << endl;
@@ -428,6 +447,8 @@ void Experiment::writeOutTxt()
 	outTXT << "rotationAngleY:" << fishImgProc.rotationAngleY << endl;
 	outTXT << "cropPoint:" << fishImgProc.cropPoint << endl;
 	outTXT << "Moving2FixAffineMatrix:";
+	outTXT << "circleCount:" << circleCount << endl;
+
 	for (int i = 0; i < fishImgProc.Moving2FixAM.size(); i++)
 	{
 		outTXT << fishImgProc.Moving2FixAM[i] << "    ";
@@ -509,29 +530,79 @@ void Experiment::imgProcess()
 
 void Experiment::controlExp()
 {
-	Timer time;
-	bool timerStart = false;
+	Timer laserTimer;
+	Timer intervalTimer;
+	bool laserTimerStart = false;
+	bool intervalTimerStart = false;
 	while (!UserWantToStop)
 	{
 		getParamsFromGUI();
 		drawGUIimg();
-
-		if (params.laserOn)
+		if (params.circleOn)   //周期性给光
 		{
-			if (!timerStart)
+			if (params.laserOn)
 			{
-				time.start();
-				timerStart = true;
+				if (!laserTimerStart)
+				{
+					laserTimer.start();
+					laserTimerStart = true;
+				}
+				if (laserTimer.getElapsedTimeInMilliSec() > params.laserTime)
+				{
+					params.laserOn = 0;
+					laserTimer.stop();
+					laserTimerStart = false;
+					cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
+					circleCount++;
+					cout << endl << "circle Count: " << circleCount << "/" << params.circleNum << endl;
+				}
 			}
-
-			if (time.getElapsedTimeInMilliSec() > params.laserTime)
+			else
 			{
-				params.laserOn = 0;
-				time.stop();
-				timerStart = false;
-				cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
-
+				if (!intervalTimerStart)
+				{
+					intervalTimer.start();
+					intervalTimerStart = true;
+				}
+				if (intervalTimer.getElapsedTimeInSec() > params.interval)
+				{
+					params.laserOn = 1;
+					intervalTimer.stop();
+					intervalTimerStart = false;
+					cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
+				}
 			}
+		}
+		else    //手动给光
+		{
+			if (params.laserOn)
+			{
+				if (!laserTimerStart)
+				{
+					laserTimer.start();
+					laserTimerStart = true;
+				}
+
+				if (laserTimer.getElapsedTimeInMilliSec() > params.laserTime)
+				{
+					params.laserOn = 0;
+					laserTimer.stop();
+					laserTimerStart = false;
+					cv::createTrackbar("LaserOn", "Control Panel for Optogenetic", &params.laserOn, 1);
+				}
+			}
+		}
+
+		if (circleCount >= params.circleNum)
+		{
+			params.circleOn = 0;
+			circleCount = 0;
+			cv::createTrackbar("circleOn", "Control Panel for Optogenetic", &params.circleOn, 1);
+		}
+
+		if (params.circleOn == 0)
+		{
+			circleCount = 0;
 		}
 	}
 
@@ -542,17 +613,22 @@ void Experiment::controlExp()
 
 void Experiment::generateGalvoVotages()
 {
+	//cout << "1" << endl;
 	bool inverse = false;
 	cv::Point p(0, 0);
 	//continue read pixel coordinates
 	galvoVotagesPairs.clear();
-	for (int i = 0; i < ROIpoints.size(); i=i+2)
+
+	//ROIpoints
+	//fishImgProc.FishReg.RegionCoord
+	for (int i = 0; i < ROIpoints.size(); i=i+1)
 	{
 		if (ROIpoints[i].x < 0 || ROIpoints[i].y < 0)
 		{
 			break;
 		}
 		cv::Point p = cv::Point(ROIpoints[i].x, ROIpoints[i].y);
+		//cout << p << endl;
 		float* Xdata = galvoMatrixX.ptr<float>(p.x);
 		float galvo_x = Xdata[p.y];
 		float* Ydata = galvoMatrixY.ptr<float>(p.x);
@@ -569,7 +645,7 @@ void Experiment::galvoControl()
 	{
 
 		bool read_inverse = false;
-		while (params.laserOn)
+		while (params.laserOn||params.laserOnLongTime)
 		{
 
 			if (read_inverse)
@@ -577,7 +653,6 @@ void Experiment::galvoControl()
 				for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)
 				{
 					galvo.spinGalvo(galvoVotagesPairs[a]);
-					//cout << galvoVotagesPairs[a] << endl;
 				}
 				read_inverse = false;
 			}
@@ -592,7 +667,7 @@ void Experiment::galvoControl()
 		}
 
 		//cout << "bbb" << endl;
-		galvo.spinGalvo(cv::Point(-5, -5));   //放在一个很偏的点
+		galvo.spinGalvo(cv::Point(-2.5, -5));   //放在一个很偏的点
 	}
 
 	cout << "galvo thread say goodbye!!" << endl;
@@ -631,7 +706,7 @@ void Experiment::TCPconnect()
 				}
 			}
 		}
-		cout << "ccc" << endl;
+		//cout << "ccc" << endl;
 	}
 
 	server.close();

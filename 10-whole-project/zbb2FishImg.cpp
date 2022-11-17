@@ -113,10 +113,13 @@ std::vector<cv::Point2f> zbb2FishImg::ZBB2FishTransform()
 	{
 		Point3f p;
 		Point3f temp = RegionCoord[i];
+		//Point3f temp = Point3f(RegionCoord[i].y, RegionCoord[i].x, 0);
 		p = applyAffineMatrixOn3DCoord(temp, zbb2FixAM);
 		p = applyAffineMatrixOn3DCoord(p, Fix2MovingAM);
 		p = p + cropPoint;
 		p = applyRotationMatrixOn3DCoord(p, rotationMatrix);
+
+		//p = temp;
 
 		regionInFish.push_back(cv::Point(p.x, p.y));
 	}
