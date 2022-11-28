@@ -83,6 +83,11 @@ public:
 	double scale;
 	std::vector<cv::Point2f> galvoVotagesPairs;
 
+	//检测鱼是否在运动，运动时关闭galvo
+	std::vector<int> headingAngleVec;
+	bool fishMoving;
+	bool movingPause;
+
 
 	//TCP server
 	TCPServer server;
@@ -110,6 +115,9 @@ public:
 
 
 	void preProcessImg();
+
+	//检测鱼是否在运动
+	void isFishMoving(int angle);
 
 	void clear();
 	void exit();

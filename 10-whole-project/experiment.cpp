@@ -80,6 +80,9 @@ void Experiment::initialize()
 	circleCount = 0;
 	UserWantToStop = 0;
 
+	fishMoving = false;
+	movingPause = false;
+
 	return;
 }
 
@@ -330,11 +333,11 @@ void Experiment::drawGUIimg()
 	cv::Mat ref = cv::imread("Ref-zbb-MIP.png", 0);   //0：read gray image
 	//即使选中的区域很小，在MIP上也能被画出来
 	cv::Rect r = roi;
-	if (r.width < 10)
+	if (r.width < 5)
 	{
 		r.width = r.width + 2;
 	}
-	if (r.height < 10)
+	if (r.height < 5)
 	{
 		r.height = r.height + 2;
 	}
@@ -355,11 +358,11 @@ void Experiment::drawGUIimg()
 	{
 		cv::RotatedRect re = cv::minAreaRect(ROIpoints);
 		//即使选中的区域很小，在MIP上也能被画出来
-		if (re.size.height < 10)
+		if (re.size.height < 5)
 		{
 			re.size.height = re.size.height + 2;
 		}
-		if (re.size.width < 10)
+		if (re.size.width < 5)
 		{
 			re.size.width = re.size.width + 2;   
 		}
@@ -372,6 +375,9 @@ void Experiment::drawGUIimg()
 		{
 			cv::line(MIP_8u, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255), 1);
 		}
+
+		//显示fish angle
+		//cv::putText(MIP_8u, to_string(server.data), cv::Point(20,20), cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(255), 1, 8, 0);
 	}
 	//for (int i = 0; i < ROIpoints.size(); i++)
 	//{
@@ -532,10 +538,18 @@ void Experiment::imgProcess()
 		{
 			//time.start();
 			ImgReconAndRegis();
-
 			getReconMIP();
 			frameCount_imgprocess = frameNum;
 			cout << " ";   //这里必须有一句输出？？？
+
+			//if (fishMoving)
+			//{
+			//	movingPause = true;   //以实际处理帧率检测鱼是否在运动
+			//}
+			//else
+			//{
+			//	movingPause = false;
+			//}
 			//time.stop();
 			//cout << "process time: " << time.getElapsedTimeInMilliSec() << endl;
 		}
@@ -666,26 +680,31 @@ void Experiment::galvoControl()
 		bool read_inverse = false;
 		while (params.laserOn||params.laserOnLongTime)
 		{
-
-			if (read_inverse)
+			if (!fishMoving)    //鱼在剧烈运动的时候不给光
 			{
-				for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)
+				if (read_inverse)
 				{
-					galvo.spinGalvo(galvoVotagesPairs[a]);
+					for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)
+					{
+						galvo.spinGalvo(galvoVotagesPairs[a]);
+					}
+					read_inverse = false;
 				}
-				read_inverse = false;
+				else
+				{
+					for (long a = 0; a < galvoVotagesPairs.size(); a++)
+					{
+						galvo.spinGalvo(galvoVotagesPairs[a]);
+					}
+					read_inverse = true;
+				}
 			}
 			else
 			{
-				for (long a = 0; a < galvoVotagesPairs.size(); a++)
-				{
-					galvo.spinGalvo(galvoVotagesPairs[a]);
-				}
-				read_inverse = true;
+				galvo.spinGalvo(cv::Point(-2.5, -5));
 			}
 		}
 
-		//cout << "bbb" << endl;
 		galvo.spinGalvo(cv::Point(-2.5, -5));   //放在一个很偏的点
 	}
 
@@ -711,10 +730,9 @@ void Experiment::TCPconnect()
 				if (server.data > 0 && server.data <= 360)
 				{
 					fishImgProc.rotationAngleX = server.data;
+					isFishMoving(server.data);    //使用tracking传过来的angle
 					//cout << fishImgProc.rotationAngleX << endl;
 				}
-				//fishImgProc.rotationAngleX = server.data;
-				//cout << server.data << endl;
 				if (!isOK)
 				{
 					printf("lose client!!\n");
@@ -744,6 +762,41 @@ void Experiment::generateGalvoVoltagesPairs()
 
 	return;
 }
+
+
+void Experiment::isFishMoving(int angle)
+{
+	headingAngleVec.push_back(angle);
+	if (headingAngleVec.size() > 100)    //vect的长度可能需要调整
+	{
+		vector<int>::iterator k = headingAngleVec.begin();
+		headingAngleVec.erase(k);//删除第一个元素
+	}
+
+	double sum = std::accumulate(std::begin(headingAngleVec), std::end(headingAngleVec), 0.0);
+	double mean = sum / headingAngleVec.size(); //均值  
+
+	double accum = 0.0;
+	std::for_each(std::begin(headingAngleVec), std::end(headingAngleVec), [&](const double d)
+	{
+		accum += (d - mean)*(d - mean);
+	});
+
+	double stdev = sqrt(accum / (headingAngleVec.size() - 1)); //方差
+
+	if (abs(angle - mean) > 5 || stdev > 5)    //mean和stdev的阈值可能需要调整
+	{
+		cout << "fish move" << endl;
+		fishMoving = true;
+	}
+	else
+	{
+		fishMoving = false;
+	}
+
+	return;
+}
+
 
 
 void Experiment::clear()
