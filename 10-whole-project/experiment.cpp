@@ -90,7 +90,7 @@ void Experiment::readFullSizeImgFromFile()
 {
 	cout << "read Image thread say hello!!" << endl;
 
-	string beforeResizeImgPath = "D:/online-opto-data/20221016_1556_g8s-lssm-chriR_8dpf/raw";
+	string beforeResizeImgPath = "D:/kexin/Online-Zebrafish-Optogenetic/data/r20210824_X10";
 	vector<string> beforeResizeImgNames;
 	getFileNames(beforeResizeImgPath, beforeResizeImgNames);
 
@@ -360,11 +360,11 @@ void Experiment::drawGUIimg()
 		//即使选中的区域很小，在MIP上也能被画出来
 		if (re.size.height < 5)
 		{
-			re.size.height = re.size.height + 2;
+			re.size.height = re.size.height + 3;
 		}
 		if (re.size.width < 5)
 		{
-			re.size.width = re.size.width + 2;   
+			re.size.width = re.size.width + 3;   
 		}
 		//获取旋转矩形的四个顶点
 		cv::Point2f* vertices = new cv::Point2f[4];
@@ -464,6 +464,7 @@ void Experiment::writeOutTxt()
 	{
 		outTXT << "laserOn:" << params.laserOn << endl;
 	}
+	outTXT << "fishMoving:" << fishMoving << endl;
 	outTXT << "xsize:" << params.xsize << endl;
 	outTXT << "xpos:" << params.xpos << endl;
 	outTXT << "ysize:" << params.ysize << endl;
@@ -669,11 +670,19 @@ void Experiment::generateGalvoVotages()
 		galvoVotagesPairs.push_back(cv::Point2f(galvo_x, galvo_y));
 		
 	}
+
+
+
 }
 
 void Experiment::galvoControl()
 {
 	cout << "I'm galvo thread." << endl;
+
+	//write out to test
+	//ofstream outfile("test.txt");
+
+
 	while (!UserWantToStop)
 	{
 
@@ -687,6 +696,7 @@ void Experiment::galvoControl()
 					for (long a = galvoVotagesPairs.size() - 1; a >= 0; a--)
 					{
 						galvo.spinGalvo(galvoVotagesPairs[a]);
+						//outfile << galvoVotagesPairs[a] << endl;
 					}
 					read_inverse = false;
 				}
@@ -708,6 +718,7 @@ void Experiment::galvoControl()
 		galvo.spinGalvo(cv::Point(-2.5, -5));   //放在一个很偏的点
 	}
 
+	//outfile.close();
 	cout << "galvo thread say goodbye!!" << endl;
 
 	return;
