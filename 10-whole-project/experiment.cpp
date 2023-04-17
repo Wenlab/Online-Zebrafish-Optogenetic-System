@@ -15,9 +15,20 @@
 
 #include <opencv2/core/utils/logger.hpp>
 
+#pragma warning(disable:4996)
+
 using namespace std;
 
-mutex m1, m2, m3, m4;
+
+struct image_time_pair
+{
+	unsigned short int* imagedata;
+	char time_stamp_s[256];
+	int frameNum = 0;
+};
+
+queue<image_time_pair> SaveImageTimeQueue;
+
 
 Experiment::Experiment(std::string modle_path) :fishImgProc(modle_path)
 {
@@ -36,7 +47,7 @@ void Experiment::initialize()
 	cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);  //关闭opencv的警告
 
 	Image = new unsigned short int[2048 * 2048 * 1];  //开辟缓存区
-	Image_forSave = new unsigned short int[2048 * 2048 * 1];
+	//Image_forSave = new unsigned short int[2048 * 2048 * 1];
 	Image4bin = new unsigned short int[512 * 512 * 1];
 	mip_cpu = new float[200 * 200 * 1];
 	cropResult_cpu = new float[76 * 95 * 50]();
@@ -94,6 +105,9 @@ void Experiment::readFullSizeImgFromFile()
 	vector<string> beforeResizeImgNames;
 	getFileNames(beforeResizeImgPath, beforeResizeImgNames);
 
+	SYSTEMTIME currentTime;
+	char time_stamp_s[256] = { 0 };
+
 	while (!UserWantToStop)
 	{
 		string filename = beforeResizeImgNames[frameNum];
@@ -136,7 +150,20 @@ void Experiment::readFullSizeImgFromFile()
 		//delete poDataset;
 
 		resizeImg();
-		memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
+		if (recordOn)
+		{
+			unsigned short int* Image_forSave = new unsigned short int[2048 * 2048 * 1];
+			memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
+
+			GetLocalTime(&currentTime);
+			sprintf(time_stamp_s, "%d_%d_%d_%d_%d", currentTime.wDay, currentTime.wHour, currentTime.wMinute, currentTime.wSecond, currentTime.wMilliseconds);
+
+			image_time_pair image_time_pair_temp;
+			image_time_pair_temp.imagedata = Image_forSave;
+			strcpy(image_time_pair_temp.time_stamp_s, time_stamp_s);
+			image_time_pair_temp.frameNum = frameNum;
+			SaveImageTimeQueue.push(image_time_pair_temp);
+		}
 
 		//cout << "read img done: " << filename << endl;
 		frameNum = frameNum + 1;
@@ -158,7 +185,9 @@ void Experiment::readFullSizeImgFromFile()
 
 void Experiment::readFullSizeImgFromCamera()
 {
-	Timer testSave;
+
+	SYSTEMTIME currentTime;
+	char time_stamp_s[256] = { 0 };
 
 	//Start Acquisition
 	T2Cam_StartAcquisition(cam_handle);
@@ -166,6 +195,8 @@ void Experiment::readFullSizeImgFromCamera()
 	{
 		if (T2Cam_GrabFrame(cam_data, cam_handle) == 0)
 		{
+			GetLocalTime(&currentTime);
+			sprintf(time_stamp_s, "%d_%d_%d_%d_%d", currentTime.wDay, currentTime.wHour, currentTime.wMinute, currentTime.wSecond, currentTime.wMilliseconds);
 			memcpy(Image, cam_data->ImageRawData, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
 		}
 		else
@@ -177,14 +208,21 @@ void Experiment::readFullSizeImgFromCamera()
 		preProcessImg();
 		resizeImg();
 
-		//if (recordOn)
-		//{
-		//	//testSave.start();
-		//	memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
-		//	saveAndCheckImage(Image_forSave, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
-		//	//testSave.stop();
-		//	//cout << "save raw image time: " << testSave.getElapsedTimeInMilliSec() << endl;
-		//}
+		//此时Image翻转了，仍保持原2048大小
+
+
+		if (recordOn)
+		{
+			unsigned short int* Image_forSave = new unsigned short int[2048 * 2048 * 1];
+			memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
+
+
+			image_time_pair image_time_pair_temp;
+			image_time_pair_temp.imagedata = Image_forSave;
+			strcpy(image_time_pair_temp.time_stamp_s, time_stamp_s);
+			image_time_pair_temp.frameNum = frameNum;
+			SaveImageTimeQueue.push(image_time_pair_temp);
+		}
 		frameNum = frameNum + 1;
 
 
@@ -235,7 +273,7 @@ void Experiment::ImgReconAndRegis()
 
 	generateGalvoVotages();
 
-	cv::waitKey(100);
+	//cv::waitKey(1);
 
 	return;
 }
@@ -450,6 +488,9 @@ void Experiment::initializeWriteOut()
 	txtName = path + fishName + "/" + fishName + ".txt";
 	outTXT.open(txtName);
 
+	string timeStampTxtName = path + fishName + "/" + "timeStamp.txt";
+	timeTXT.open(timeStampTxtName);
+
 	return;
 }
 
@@ -473,7 +514,7 @@ void Experiment::writeOutTxt()
 	outTXT << "rotationAngleY:" << fishImgProc.rotationAngleY << endl;
 	outTXT << "cropPoint:" << fishImgProc.cropPoint << endl;
 	outTXT << "Moving2FixAffineMatrix:";
-	outTXT << "circleCount:" << circleCount << endl;
+	outTXT << "circleCount:" << circleCount << endl; 
 
 	for (int i = 0; i < fishImgProc.Moving2FixAM.size(); i++)
 	{
@@ -487,41 +528,33 @@ void Experiment::writeOutData()
 {
 	cout << "write out thread say hello :p" << endl;
 
-	//Timer time;
-	//string TimetxtName = "E:/online-opto-data/testSave.txt";
-	//std::ofstream testSavetxt(TimetxtName);
-
 
 	int frameCount_writeOut = 0;
 	while (!UserWantToStop)
 	{
-		if (recordOn)
+		if (SaveImageTimeQueue.size()>1)
 		{
-			if (frameCount_writeOut != frameNum)
-			{
-				//time.start();
-
-				memcpy(Image_forSave, Image, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
-				saveAndCheckImage(Image_forSave, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, frameNum) + ".tif");
-
-				cudaMemcpy(cropResult_cpu, fishImgProc.ObjCropRed_gpu, sizeof(float) * 76 * 95 * 50, cudaMemcpyDeviceToHost);   //1
-				saveAndCheckImage(cropResult_cpu, 76, 95, 50, cropfolderName + "/" + int2string(6, frameNum) + ".tif");    //2
-				writeOutTxt();   //3
-				MIPWriter.write(ref_mip_resize);  //4
-				frameCount_writeOut = frameNum;
-				
-
-				//time.stop();
-				//cout << time.getElapsedTimeInMilliSec() << endl;
-				//cout << "save time: " << time.getElapsedTimeInMilliSec() << endl;
-			}
+			image_time_pair savePair = SaveImageTimeQueue.front();
+			saveAndCheckImage(savePair.imagedata, CCDSIZEX, CCDSIZEY, 1, rawfolderName + "/" + int2string(6, savePair.frameNum) + ".tif");
+			timeTXT << savePair.time_stamp_s << endl;
+			SaveImageTimeQueue.pop();
+			delete savePair.imagedata;
+			savePair.imagedata = NULL;
 		}
 
-
+		if (recordOn&&frameCount_writeOut != frameNum)
+		{
+			cudaMemcpy(cropResult_cpu, fishImgProc.ObjCropRed_gpu, sizeof(float) * 76 * 95 * 50, cudaMemcpyDeviceToHost);   //1
+			saveAndCheckImage(cropResult_cpu, 76, 95, 50, cropfolderName + "/" + int2string(6, frameNum) + ".tif");    //2
+			writeOutTxt();   //3
+			MIPWriter.write(ref_mip_resize);  //4
+			frameCount_writeOut = frameNum;
+		}
 	}
 	//testSavetxt.close();
 	MIPWriter.release();
 	outTXT.close();
+	timeTXT.close();
 
 	cout << "write out thread say goodbye!!" << endl;
 	return;
@@ -542,17 +575,6 @@ void Experiment::imgProcess()
 			getReconMIP();
 			frameCount_imgprocess = frameNum;
 			cout << " ";   //这里必须有一句输出？？？
-
-			//if (fishMoving)
-			//{
-			//	movingPause = true;   //以实际处理帧率检测鱼是否在运动
-			//}
-			//else
-			//{
-			//	movingPause = false;
-			//}
-			//time.stop();
-			//cout << "process time: " << time.getElapsedTimeInMilliSec() << endl;
 		}
 
 	}
@@ -816,7 +838,6 @@ void Experiment::clear()
 	fishImgProc.freeMemory();
 
 	delete[] Image;
-	delete[] Image_forSave;
 	delete[] Image4bin;
 	delete[] mip_cpu;
 	delete[] cropResult_cpu;

@@ -37,7 +37,7 @@ public:
 	int frameNum;
 
 	unsigned short int *Image;
-	unsigned short int *Image_forSave;
+	//unsigned short int *Image_forSave;
 	unsigned short int *Image4bin;
 	float* mip_cpu;
 	float* cropResult_cpu;
@@ -73,6 +73,7 @@ public:
 	std::string cropfolderName;
 	std::string txtName;
 	std::ofstream outTXT;
+	std::ofstream timeTXT;
 
 	//galvo control
 	double galvoXmin;
