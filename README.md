@@ -9,6 +9,8 @@ A user first selects the region to be stimulated on the zebrafish brain browser 
 The system then translates the region into actual locations on the fish brain and delivers photo-stimulation through real-time image processing and coordinate transformation. 
 Optogenetic system was built up in C++ and CUDA.   
 
+![pipeline](pipeline/pipeline.png)
+
 The working code is in [optogenetic-src](10-optogenetic-src).
 Code for offline fast reconstruction is in [4bin-reconstruction](01-4bin-reconstruction).
 Code for organizing dataset and training affine network is in [affine-network](02-affine-CNNnetwork).
