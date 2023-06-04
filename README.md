@@ -4,7 +4,7 @@ Source code of online optogenetic system in  "[*All-optical interrogation of bra
 
 ## Introduction
 
-we achieved the optogenetic system that enables real-time manipulation of user-defined brain regions in freely behaving larval zebrafish. 
+We achieved the optogenetic system that enables real-time manipulation of user-defined brain regions in freely behaving larval zebrafish. 
 A user first selects the region to be stimulated on the zebrafish brain browser (ZBB) atlas. 
 The system then translates the region into actual locations on the fish brain and delivers photo-stimulation through real-time image processing and coordinate transformation. 
 Optogenetic system was built up in C++ and CUDA.   
