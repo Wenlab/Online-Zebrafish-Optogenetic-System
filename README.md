@@ -1,6 +1,6 @@
 # Online-Zebrafish-Optogenetics-System
 
-Source code of online optogenetic system in  "[*All-optical interrogation of brain-wide activity in freely swimming larval zebrafish*](https://www.biorxiv.org/content/10.1101/2023.05.24.542114v1)"
+Source code of online optogenetic system in  "[*All-optical interrogation of brain-wide activity in freely swimming larval zebrafish*](https://www.biorxiv.org/content/10.1101/2023.05.24.542114v1)".
 
 ## Introduction
 
