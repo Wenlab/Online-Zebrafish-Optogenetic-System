@@ -76,6 +76,5 @@ We resized an image from 2048 * 2048 pixels to 512 * 512 pixels using the [https
 ## Contributors
 - [Kexin Qi](https://github.com/kexin2016) (`kexinqi@mail.ustc.edu.cn`)
 - [Chen Shen](https://github.com/Distagon-T)(`cshen@ustc.edu.cn`)
-- [Quan Wen](https://github.com/wenquan) (`qwen@ustc.edu.cn`)
 
   
