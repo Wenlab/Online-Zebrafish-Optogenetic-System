@@ -24,17 +24,17 @@ std::string Float2Str(float Num);
 
 int main()
 {
-	//荧光相机视野范围内galvo的电压范围 -1.5~1.5
+	//Input voltage range of galvo -1.5~1.5
 
 	float galvoMin = -1.5;
 	float galvoMax = 1.5;
 	float step = 0.2;
 
 	//cameras
-	AT_H cam_handle; //相机句柄变量的声明,随后将再初始化时为其赋值,之后用它来传递相机信息
+	AT_H cam_handle; 
 	CamData* cam_data;
-	////初始化相机
-	cam_data = T2Cam_CreateCamData(); //动态申请CamData结构体的空间,创建指向该空间的cam_data指针
+	//Initializing the camera
+	cam_data = T2Cam_CreateCamData(); 
 	T2Cam_InitializeLib(&cam_handle);
 	SetupBinningandAOI(cam_handle);
 	T2Cam_InitializeCamData(cam_data, cam_handle);
@@ -42,20 +42,19 @@ int main()
 	CreateBuffer(cam_data, cam_handle);
 	cout << "camera prepare done" << endl;
 
-	////初始化galvo
+	//Initializing the galvo
 	GalvoData galvo;
 	galvo.initialize();
 
-	//初始化GDLA
+	//Initializing GDLA
 	GDALAllRegister(); OGRRegisterAll();
-	//设置支持中文路径
+	//Set Chinese path support
 	CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
 	CPLSetConfigOption("SHAPE_ENCODING", "");
 
-	//开内存
-	unsigned short int *Image = new unsigned short int[2048 * 2048 * 1];  //开辟缓存区
+	unsigned short int *Image = new unsigned short int[2048 * 2048 * 1];
 
-	//创建存储文件夹
+	//Initializing save path
 	int ret;
 	string rootPath = "D:/kexin/Galvo-Calibration/calibrationData/";
 	ret = _access(rootPath.c_str(), 0);
@@ -96,7 +95,7 @@ int main()
 				{
 					memcpy(Image, cam_data->ImageRawData, CCDSIZEX * CCDSIZEY * sizeof(unsigned short));
 					cv::Mat temp(cv::Size(CCDSIZEX, CCDSIZEY), CV_16UC1, Image);
-					cv::flip(temp, temp, 0);   //flipcode=0,垂直翻转图像
+					cv::flip(temp, temp, 0);   //flipcode=0, Vertical Flip Image
 				}
 				else
 				{
@@ -120,9 +119,7 @@ int main()
 void preProcessImg(unsigned short int *Image)
 {
 	cv::Mat temp(cv::Size(CCDSIZEX, CCDSIZEY), CV_16UC1, Image);
-	cv::flip(temp, temp, 0);   //flipcode=0,垂直翻转图像
-	//imshow("test", temp);
-	//waitKey(1);
+	cv::flip(temp, temp, 0);   //flipcode=0, Vertical Flip Image
 
 	return;
 }
@@ -130,9 +127,7 @@ void preProcessImg(unsigned short int *Image)
 
 void saveAndCheckImage(unsigned short int* imageData, int col_total, int row_total, int z_total, string name)
 {
-	//cout << col_total << "  " << row_total << " " << z_total << endl;
 
-	//输出图像
 	GDALDriver * pDriver = GetGDALDriverManager()->GetDriverByName("GTiff");
 	GDALDataset *ds = pDriver->Create(name.c_str(), col_total, row_total, z_total, GDT_UInt16, NULL);
 	if (ds == NULL)
@@ -141,22 +136,19 @@ void saveAndCheckImage(unsigned short int* imageData, int col_total, int row_tot
 		system("pause");
 		return;
 	}
-	//ofstream fout(path + name + ".txt", ios::out);
-	//fout << setprecision(9);
+
 	unsigned short int  *ObjRecon_buffer = new unsigned short int[col_total];
 	for (int band = 0; band < z_total; band++)
 	{
-		for (int i = 0; i < row_total; i++)//行循环
+		for (int i = 0; i < row_total; i++)//row
 		{
-			for (int j = 0; j < col_total; j++)//列循环
+			for (int j = 0; j < col_total; j++)//col
 			{
 				ObjRecon_buffer[j] = imageData[band * col_total * row_total + i * col_total + j];
 			}
 			ds->GetRasterBand(band + 1)->RasterIO(GF_Write, 0, i, col_total, 1, ObjRecon_buffer, col_total, 1, GDT_UInt16, 0, 0);
 		}
-		//cout << band << endl;
 	}
-	//fout.close();
 	delete ds;
 	delete[] ObjRecon_buffer;
 
@@ -189,22 +181,16 @@ std::string Float2Str(float Num)
 	return str;
 }
 
-/* 函数说明 整型转固定格式的字符串
-输入：
-n 需要输出的字符串长度
-i 需要结构化的整型
-输出：
-返回转化后的字符串
-*/
+
 std::string int2string(int n, int i)
 {
 	char s[BUFSIZ];
 	sprintf_s(s, "%d", i);
-	int l = strlen(s);  // 整型的位数
+	int l = strlen(s);
 
 	if (l > n)
 	{
-		std::cout << "整型的长度大于需要格式化的字符串长度！";
+		std::cout << "The length of the integer is greater than the length of the string to be formatted!";
 	}
 	else
 	{

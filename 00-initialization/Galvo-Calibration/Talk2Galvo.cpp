@@ -53,7 +53,6 @@ bool GalvoData::initialize()
 	}
 
 	error = DAQmxCfgSampClkTiming(taskHandle1, "", 50000, DAQmx_Val_Rising, DAQmx_Val_ContSamps,8000);
-	//error = DAQmxCfgSampClkTiming(taskHandle2, "", 50000, DAQmx_Val_Rising, DAQmx_Val_ContSamps, 5000);
 
 	if (error != 0)
 	{
