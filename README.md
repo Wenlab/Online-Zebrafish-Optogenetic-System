@@ -9,10 +9,10 @@ A user first selects the region to be stimulated on the zebrafish brain browser 
 The system then translates the region into actual locations on the fish brain and delivers photo-stimulation through real-time image processing and coordinate transformation. 
 Optogenetic system was built up in C++ and CUDA.   
 
-The working code is in [10-optogenetic-src](optogenetic-src]).
-Code for offline fast reconstruction is in [01-4bin-reconstruction](4bin-reconstruction).
-Code for organizing dataset and training affine network is in [02-affine-CNNnetwork](affine-network).
-Code for generating Galvo voltage matrix is in [00-initialization](initialization).
+The working code is in [optogenetic-src](10-optogenetic-src).
+Code for offline fast reconstruction is in [4bin-reconstruction](01-4bin-reconstruction).
+Code for organizing dataset and training affine network is in [affine-network](02-affine-CNNnetwork).
+Code for generating Galvo voltage matrix is in [initialization](00-initialization).
 
 
 ## Pipeline
@@ -21,7 +21,7 @@ After the images were captured by the red fluorescence camera, the image reconst
 
 <details>
 <summary> Image reconstruction and registration </summary>
-We resized an image from 2048 * 2048 pixels to 512 * 512 pixels using the AVIR image resizing algorithm designed by Aleksey Vaneev (\url{https://github.com/avaneev/avir}).
+We resized an image from 2048 * 2048 pixels to 512 * 512 pixels using the [https://github.com/avaneev/avir] (AVIR image resizing algorithm designed by Aleksey Vaneev).
   Due to the reduced image size and memory consumption, we could use the PSF of the whole volume to do the deconvolution with a total of 10 iterations.
   We used TCP to communicate between the tracking system and the optogenetic system.   
   
@@ -74,7 +74,7 @@ We resized an image from 2048 * 2048 pixels to 512 * 512 pixels using the AVIR i
 
 ## Contributors
 - [Kexin Qi](https://github.com/kexin2016) (`kexinqi@mail.ustc.edu.cn`)
-- [Chen Shen](https://github.com/Distagon-T)(`cshen@ustc.edu.cn)
+- [Chen Shen](https://github.com/Distagon-T)(`cshen@ustc.edu.cn`)
 - [Quan Wen](https://github.com/wenquan) (`qwen@ustc.edu.cn`)
 
   
