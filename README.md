@@ -59,7 +59,7 @@ We resized an image from 2048 * 2048 pixels to 512 * 512 pixels using the [https
   - I/O Device (National Instruments PCIe-6321, US)
   - sCMOS cameras (Andor Zyla 4.2, UK)
   - 588 nm laser (CNI MGL-III-588, China)
-  - NVIDIA GeForce RTX 3080ti
+  - NVIDIA GeForce RTX 3080 Ti
 
 
   ## Dependency
